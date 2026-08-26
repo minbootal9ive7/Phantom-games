@@ -8,6 +8,7 @@ from io import BytesIO
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -88,11 +89,6 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-@bot.tree.command(name="games", description="Show all available games")
-async def games_cmd(interaction: discord.Interaction):
-    text = "\n".join(f"**{name}**" for name in games.GAMES.values())
-    await interaction.response.send_message(embed=games.embed("قائمة الألعاب", f"قائمة الألعاب المتاحة:\n\n{text}\n\nاستخدم أمر /game لبدء أي لعبة!"))
-
 GAME_CHOICES = [
     discord.app_commands.Choice(name="Roulette", value="roulette"),
     discord.app_commands.Choice(name="Mafia", value="mafia"),
@@ -111,77 +107,90 @@ GAME_CHOICES = [
 @bot.tree.command(name="game", description="Start a new game")
 @discord.app_commands.choices(choice=GAME_CHOICES)
 async def game_cmd(interaction: discord.Interaction, choice: discord.app_commands.Choice[str]):
-    g, p = choice.value, interaction.user
-    
-    if g == "roulette":
-        cid = interaction.channel_id
-        if cid in roulette_games:
-            return await interaction.response.send_message("تنبيه: توجد لعبة روليت تعمل بالفعل في هذه الروم.", ephemeral=True)
+    try:
+        g, p = choice.value, interaction.user
         
-        roulette_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
-        
-        view = RouletteLobbyView(cid)
-        await interaction.response.send_message(
-            embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط على زر الانضمام للمشاركة خلال 20 ثانية"),
-            view=view
-        )
-        msg = await interaction.original_response()
-        
-        asyncio.create_task(run_roulette_timer(cid, interaction.channel, msg, view))
-        return
-
-    if g == "dice":
-        res, wins = games.roll_dice([p.display_name, "البوت"])
-        txt = "\n".join(f"**{k}**: `{v}`" for k, v in res.items())
-        return await interaction.response.send_message(embed=games.embed("رمي النرد", f"{txt}\n\nالفائز: {', '.join(wins)}", config.COLORS["success"]))
-
-    if g == "mafia":
-        cid = interaction.channel_id
-        if cid in mafia_games:
-            return await interaction.response.send_message("تنبيه: توجد لعبة مافيا تعمل بالفعل هنا.", ephemeral=True)
-        mafia_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
-        return await interaction.response.send_message(embed=games.embed("لعبة المافيا", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nالحد الأدنى المطلوب: 4 لاعبين"), view=MafiaView(cid))
-
-    if g == "country":
-        c = games.random_country()
-        return await interaction.response.send_message(embed=games.embed("احزر الدولة", f"ما هي الدولة التي يتبعها هذا العلم؟\n\n{c['flag']}"), view=CountryView(c))
-
-    if g == "hide":
-        seeker, hidden = games.hide_and_seek([p.display_name, "اللاعب 2", "اللاعب 3", "اللاعب 4"])
-        return await interaction.response.send_message(embed=games.embed("لعبة الاختباء", f"الباحث: {seeker}\nالمختبئون:\n" + "".join(f"- {x}\n" for x in hidden)))
-
-    if g == "chairs":
-        cid = interaction.channel_id
-        if cid in chairs_games:
-            return await interaction.response.send_message("تنبيه: الكراسي تعمل بالفعل هنا.", ephemeral=True)
-        chairs_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False, "round": 0}
-        return await interaction.response.send_message(embed=games.embed("الكراسي", f"المنشئ: {p.mention}\nاللاعبون: 1"), view=ChairsLobbyView(cid))
-
-    if g == "replica":
-        return await interaction.response.send_message(embed=games.embed("لعبة النسخة", f"الشخصية المختارة:\n{games.replica([p.display_name, 'اللاعب 2', 'اللاعب 3'])}"))
-
-    if g == "rps":
-        return await interaction.response.send_message(embed=games.embed("حجر ورقة مقص", "اختر حركتك:"), view=RPSView())
-
-    if g in ("xo", "hotxo"):
-        return await interaction.response.send_message(embed=games.embed("لعبة إكس أو", "الدور على: X"), view=XoView())
-
-    if g == "bus":
-        cid = interaction.channel_id
-        if cid in bus_games:
-            return await interaction.response.send_message("تنبيه: لعبة أتوبيس كومبليت تعمل بالفعل في هذه الروم.", ephemeral=True)
+        if g == "roulette":
+            cid = interaction.channel_id
+            if cid in roulette_games:
+                return await interaction.response.send_message("تنبيه: توجد لعبة روليت تعمل بالفعل في هذه الروم.", ephemeral=True)
             
-        letter = random.choice(ARABIC_LETTERS)
-        chosen_cat = random.choice(BUS_CATEGORIES)
-        chosen_length = random.randint(3, 5)
-        
-        bus_games[cid] = {"letter": letter, "category": chosen_cat, "length": chosen_length, "host": p.id}
-        
-        view = BusControlView(cid, p.id)
-        return await interaction.response.send_message(
-            embed=games.embed("أتوبيس كومبليت", f"المطلوب: **{chosen_cat}** بحرف **{letter}**\n(يجب أن تتكون الكلمة من **{chosen_length}** أحرف صحيحة)\n\nاكتب الإجابة الصحيحة في الشات بأسرع ما يمكنك!"),
-            view=view
-        )
+            roulette_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
+            
+            view = RouletteLobbyView(cid)
+            await interaction.response.send_message(
+                embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط على زر الانضمام للمشاركة خلال 20 ثانية"),
+                view=view
+            )
+            msg = await interaction.original_response()
+            asyncio.create_task(run_roulette_timer(cid, interaction.channel, msg, view))
+            return
+
+        if g == "dice":
+            res, wins = games.roll_dice([p.display_name, "البوت"])
+            txt = "\n".join(f"**{k}**: `{v}`" for k, v in res.items())
+            return await interaction.response.send_message(embed=games.embed("رمي النرد", f"{txt}\n\nالفائز: {', '.join(wins)}", config.COLORS["success"]))
+
+        if g == "mafia":
+            cid = interaction.channel_id
+            if cid in mafia_games:
+                return await interaction.response.send_message("تنبيه: توجد لعبة مافيا تعمل بالفعل هنا.", ephemeral=True)
+            mafia_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
+            return await interaction.response.send_message(embed=games.embed("لعبة المافيا", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nالحد الأدنى المطلوب: 4 لاعبين"), view=MafiaView(cid))
+
+        if g == "country":
+            c = games.random_country()
+            return await interaction.response.send_message(embed=games.embed("احزر الدولة", f"ما هي الدولة التي يتبعها هذا العلم؟\n\n{c['flag']}"), view=CountryView(c))
+
+        if g == "hide":
+            seeker, hidden = games.hide_and_seek([p.display_name, "اللاعب 2", "اللاعب 3", "اللاعب 4"])
+            return await interaction.response.send_message(embed=games.embed("لعبة الاختباء", f"الباحث: {seeker}\nالمختبئون:\n" + "".join(f"- {x}\n" for x in hidden)))
+
+        if g == "chairs":
+            cid = interaction.channel_id
+            if cid in chairs_games:
+                return await interaction.response.send_message("تنبيه: الكراسي تعمل بالفعل هنا.", ephemeral=True)
+            chairs_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False, "round": 0}
+            return await interaction.response.send_message(embed=games.embed("الكراسي", f"المنشئ: {p.mention}\nاللاعبون: 1"), view=ChairsLobbyView(cid))
+
+        if g == "replica":
+            return await interaction.response.send_message(embed=games.embed("لعبة النسخة", f"الشخصية المختارة:\n{games.replica([p.display_name, 'اللاعب 2', 'اللاعب 3'])}"))
+
+        if g == "rps":
+            return await interaction.response.send_message(embed=games.embed("حجر ورقة مقص", "اختر حركتك:"), view=RPSView())
+
+        if g in ("xo", "hotxo"):
+            return await interaction.response.send_message(embed=games.embed("لعبة إكس أو", "الدور على: X"), view=XoView())
+
+        if g == "bus":
+            cid = interaction.channel_id
+            if cid in bus_games:
+                return await interaction.response.send_message("تنبيه: لعبة أتوبيس كومبليت تعمل بالفعل في هذه الروم.", ephemeral=True)
+                
+            letter = random.choice(ARABIC_LETTERS)
+            chosen_cat = random.choice(BUS_CATEGORIES)
+            chosen_length = random.randint(3, 5)
+            
+            bus_games[cid] = {"letter": letter, "category": chosen_cat, "length": chosen_length, "host": p.id}
+            
+            view = BusControlView(cid, p.id)
+            return await interaction.response.send_message(
+                embed=games.embed("أتوبيس كومبليت", f"المطلوب: **{chosen_cat}** بحرف **{letter}**\n(يجب أن تتكون الكلمة من **{chosen_length}** أحرف صحيحة)\n\nاكتب الإجابة الصحيحة في الشات بأسرع ما يمكنك!"),
+                view=view
+            )
+            
+        # Fallback for unhandled games
+        await interaction.response.send_message(embed=games.embed("تنبيه", "هذه اللعبة غير متوفرة حالياً أو تحت الصيانة."), ephemeral=True)
+
+    except Exception as e:
+        print(f"Error in game_cmd: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("حدث خطأ أثناء تشغيل اللعبة، يجدر بالمطور مراجعة السجلات.", ephemeral=True)
+            else:
+                await interaction.followup.send("حدث خطأ داخلي أثناء تنفيذ الأمر.", ephemeral=True)
+        except:
+            pass
 
 # ================= VIEWS & TIMERS =================
 
@@ -198,7 +207,6 @@ class BusControlView(discord.ui.View):
             return await interaction.response.send_message("اللعبة منتهية بالفعل أو غير مفعلة.", ephemeral=True)
         
         bus_games.pop(self.cid, None)
-        
         for child in self.children:
             child.disabled = True
             
@@ -217,7 +225,10 @@ async def run_roulette_timer(cid, channel, msg, view):
     
     players_data = []
     for usr in players_list:
-        avatar_img = await games.download_avatar(usr.display_avatar.url)
+        try:
+            avatar_img = await games.download_avatar(usr.display_avatar.url)
+        except:
+            avatar_img = None
         players_data.append({"name": usr.display_name, "user": usr, "avatar": avatar_img})
         
     display_names = [p["name"] for p in players_data]
@@ -231,10 +242,13 @@ async def run_roulette_timer(cid, channel, msg, view):
     except:
         pass
     
-    gif = games.create_roulette_gif(players_data, winner_name)
-    file = discord.File(gif, filename="roulette.gif")
-    
-    spin_msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير..."), file=file)
+    try:
+        gif = games.create_roulette_gif(players_data, winner_name)
+        file = discord.File(gif, filename="roulette.gif")
+        spin_msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير..."), file=file)
+    except Exception as e:
+        print(f"Roulette GIF error: {e}")
+        spin_msg = await channel.send(embed=games.embed("عجلة الروليت", f"الفائز هو: **{winner_name}**"))
     
     await asyncio.sleep(6.5)
     
@@ -246,14 +260,18 @@ async def run_roulette_timer(cid, channel, msg, view):
     winner_embed = games.embed("فائز الروليت", f"مبروك للفائز:\n{winner_user.mention}", config.COLORS["success"])
     
     if winner_avatar:
-        avatar_io = BytesIO()
-        winner_avatar.save(avatar_io, format="PNG")
-        avatar_io.seek(0)
-        file_avatar = discord.File(avatar_io, filename="winner.png")
-        winner_embed.set_thumbnail(url="attachment://winner.png")
-        await channel.send(file=file_avatar, embed=winner_embed)
-    else:
-        await channel.send(embed=winner_embed)
+        try:
+            avatar_io = BytesIO()
+            winner_avatar.save(avatar_io, format="PNG")
+            avatar_io.seek(0)
+            file_avatar = discord.File(avatar_io, filename="winner.png")
+            winner_embed.set_thumbnail(url="attachment://winner.png")
+            await channel.send(file=file_avatar, embed=winner_embed)
+            return
+        except:
+            pass
+            
+    await channel.send(embed=winner_embed)
 
 class RouletteLobbyView(discord.ui.View):
     def __init__(self, cid):
@@ -404,17 +422,4 @@ class CountryView(discord.ui.View):
             btn.callback = cb
             self.add_item(btn)
 
-class RPSView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=30)
-        for c in [("حجر", "Rock"), ("ورقة", "Paper"), ("مقص", "Scissors")]:
-            btn = discord.ui.Button(label=c[0], style=discord.ButtonStyle.primary)
-            async def cb(i: discord.Interaction, choice=c[1]):
-                bot_c_val = random.choice(["Rock", "Paper", "Scissors"])
-                wins = {"Rock": "Scissors", "Scissors": "Paper", "Paper": "Rock"}
-                
-                trans = {"Rock": "حجر", "Paper": "ورقة", "Scissors": "مقص"}
-                res = "تعادل" if choice == bot_c_val else ("لقد فزت" if wins[choice] == bot_c_val else "فاز البوت")
-                
-                await i.response.edit_message(embed=games.embed("حجر ورقة مقص", f"أنت: {trans[choice]}\nالبوت: {trans[bot_c_val]}\n\n**{res}**"), view=None)
-            bt
+class R
