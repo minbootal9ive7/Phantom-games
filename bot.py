@@ -13,7 +13,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 mafia_games = {}
 chairs_games = {}
 roulette_games = {}
-bus_games = {}  # لتخزين جلسات أتوبيس كومبليت النشطة لكل شات
+bus_games = {}
 
 @bot.event
 async def on_ready():
@@ -23,9 +23,6 @@ async def on_ready():
     except Exception as e:
         print(f"Sync error: {e}")
 
-# =========================================================
-# 🎮 نظام تفاعل أتوبيس كومبليت (Listener)
-# =========================================================
 @bot.event
 async def on_message(message):
     if message.author.bot:
@@ -37,12 +34,8 @@ async def on_message(message):
         target_letter = game_data["letter"].lower()
         content = message.content.strip().lower()
 
-        # التحقق إذا كانت الكلمة تبدأ بالحرف المطلوب
         if content.startswith(target_letter) and len(content) > 1:
-            # إيقاف الجلسة الحالية مؤقتاً لتجنب التكرار
             bus_games.pop(cid, None)
-            
-            # اختيار حرف جديد للسؤال التالي
             new_letter = random.choice("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
             bus_games[cid] = {"letter": new_letter}
 
@@ -51,7 +44,6 @@ async def on_message(message):
             return
 
     await bot.process_commands(message)
-
 
 @bot.tree.command(name="games", description="عرض جميع الألعاب المتاحة")
 async def games_cmd(interaction: discord.Interaction):
@@ -127,7 +119,6 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
         bus_games[cid] = {"letter": letter}
         return await interaction.response.send_message(embed=games.embed("🚌 أتوبيس كومبليت", f"الحرف المطلـوب: **{letter}**\n\nاكتب كلمة تبدأ بهذا الحرف في الشات بأسرع ما يمكن!"))
 
-
 # ================= VIEWS =================
 class RouletteLobbyView(discord.ui.View):
     def __init__(self, cid):
@@ -163,7 +154,7 @@ class RouletteLobbyView(discord.ui.View):
         await channel.send(embed=games.embed("🎉 الفائز في الروليت", f"مبروك الفائز:\n# {winner}", config.COLORS["success"]))
 
 class MafiaView(discord.ui.View):
-    def __init__(, cid):
+    def __init__(self, cid):  # تم تصحيح الخطأ هنا بإضافة self
         super().__init__(timeout=300)
         self.cid = cid
 
@@ -305,4 +296,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-    
+        
