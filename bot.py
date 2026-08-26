@@ -37,18 +37,22 @@ async def on_message(message):
         game_data = bus_games[cid]
         target_letter = game_data["letter"]
         target_cat = game_data["category"]
+        target_length = game_data["length"] # طول الكلمة العشوائي المطلوب لهذه الجولة
         content = message.content.strip()
 
-        if content.startswith(target_letter) and 3 <= len(content) <= 5:
+        # التحقق من أن الكلمة تبدأ بالحرف وطولها يطابق الطول العشوائي المحدد بالضبط
+        if content.startswith(target_letter) and len(content) == target_length:
             new_letter = random.choice(ARABIC_LETTERS)
             new_cat = random.choice(BUS_CATEGORIES)
+            new_length = random.randint(3, 5) # توليد طول عشوائي جديد (3 أو 4 أو 5)
             
             bus_games[cid]["letter"] = new_letter
             bus_games[cid]["category"] = new_cat
+            bus_games[cid]["length"] = new_length
 
             embed_res = games.embed(
                 "إجابة صحيحة", 
-                f"أحسنت {message.author.mention}! الكلمة ({message.content}) صحيحة.\n\nالسؤال الجديد:\nالمطلوب: **{new_cat}** بحرف **{new_letter}** (من 3 إلى 5 أحرف)\n\nاستمروا في الكتابة أو اضغطوا على زر الإيقاف أدناه.", 
+                f"أحسنت {message.author.mention}! الكلمة ({message.content}) صحيحة.\n\nالسؤال الجديد:\nالمطلوب: **{new_cat}** بحرف **{new_letter}** (تتكون من **{new_length}** أحرف)\n\nاستمروا في الكتابة أو اضغطوا على زر الإيقاف أدناه.", 
                 config.COLORS["success"]
             )
             
@@ -56,8 +60,8 @@ async def on_message(message):
             await message.reply(embed=embed_res, view=view)
             return
         else:
-            if len(content) > 0 and (not content.startswith(target_letter) or not (3 <= len(content) <= 5)):
-                embed_err = games.embed("إجابة خاطئة", f"تأكد أن تبدأ الكلمة بحرف **{target_letter}** وأن يكون طولها بين **3 و 5 أحرف** فقط.", config.COLORS.get("error", 0xFF0000))
+            if len(content) > 0 and (not content.startswith(target_letter) or len(content) != target_length):
+                embed_err = games.embed("إجابة خاطئة", f"تأكد أن تبدأ الكلمة بحرف **{target_letter}** وأن تتكون من **{target_length}** أحرف تماماً.", config.COLORS.get("error", 0xFF0000))
                 await message.reply(embed=embed_err, delete_after=3)
                 return
 
@@ -148,12 +152,13 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
             
         letter = random.choice(ARABIC_LETTERS)
         chosen_cat = random.choice(BUS_CATEGORIES)
+        chosen_length = random.randint(3, 5) # طول عشوائي (3 أو 4 أو 5)
         
-        bus_games[cid] = {"letter": letter, "category": chosen_cat, "host": p.id}
+        bus_games[cid] = {"letter": letter, "category": chosen_cat, "length": chosen_length, "host": p.id}
         
         view = BusControlView(cid, p.id)
         return await interaction.response.send_message(
-            embed=games.embed("أتوبيس كومبليت", f"المطلوب: **{chosen_cat}** بحرف **{letter}**\n(يجب أن تتكون الكلمة من **3 إلى 5 أحرف**)\n\nاكتب الإجابة الصحيحة في الشات بأسرع ما يمكنك!"),
+            embed=games.embed("أتوبيس كومبليت", f"المطلوب: **{chosen_cat}** بحرف **{letter}**\n(يجب أن تتكون الكلمة من **{chosen_length}** أحرف)\n\nاكتب الإجابة الصحيحة في الشات بأسرع ما يمكنك!"),
             view=view
         )
 
@@ -395,4 +400,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-        
+            
