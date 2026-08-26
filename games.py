@@ -23,7 +23,8 @@ GAMES = {
     "replica": "🪞 Replica",
     "rps": "✊ حجر ورق مقص",
     "xo": "❌⭕ XO",
-    "hotxo": "🔥 Hot XO"
+    "hotxo": "🔥 Hot XO",
+    "bus": "🚌 أتوبيس كومبليت"
 }
 
 
@@ -49,7 +50,6 @@ def roulette_gif(players, winner):
     segment = 360 / count
     winner_i = players.index(winner)
 
-    # جعل الفائز أمام السهم
     target = (
         -90
         - (winner_i * segment + segment / 2)
@@ -75,39 +75,19 @@ def roulette_gif(players, winner):
     frames = []
 
     for n in range(70):
-
         p = n / 69
-
-        # تباطؤ تدريجي
         ease = 1 - (1 - p) ** 4
-
         rotation = target * ease
 
-        img = Image.new(
-            "RGB",
-            (W, H),
-            (18, 18, 25)
-        )
-
+        img = Image.new("RGB", (W, H), (18, 18, 25))
         d = ImageDraw.Draw(img)
 
         for i, name in enumerate(players):
-
-            start = (
-                -90
-                + rotation
-                + i * segment
-            )
-
+            start = -90 + rotation + i * segment
             end = start + segment
 
             d.pieslice(
-                (
-                    C-R,
-                    C-R,
-                    C+R,
-                    C+R
-                ),
+                (C-R, C-R, C+R, C+R),
                 start,
                 end,
                 fill=colors[i % len(colors)],
@@ -115,35 +95,22 @@ def roulette_gif(players, winner):
                 width=2
             )
 
-            a = math.radians(
-                start + segment / 2
-            )
-
+            a = math.radians(start + segment / 2)
             x = C + math.cos(a) * R * .62
             y = C + math.sin(a) * R * .62
 
             text = str(name)
-
             if len(text) > 11:
                 text = text[:11] + "…"
 
-            box = d.textbbox(
-                (0, 0),
-                text,
-                font=font
-            )
-
+            box = d.textbbox((0, 0), text, font=font)
             d.text(
-                (
-                    x - (box[2]-box[0])/2,
-                    y - (box[3]-box[1])/2
-                ),
+                (x - (box[2]-box[0])/2, y - (box[3]-box[1])/2),
                 text,
                 fill="white",
                 font=font
             )
 
-        # المنتصف
         d.ellipse(
             (235, 235, 365, 365),
             fill=(20, 20, 28),
@@ -151,27 +118,12 @@ def roulette_gif(players, winner):
             width=4
         )
 
-        d.text(
-            (263, 288),
-            "NIGHTFALL",
-            fill="white",
-            font=font
-        )
+        d.text((263, 288), "NIGHTFALL", fill="white", font=font)
 
-        # السهم
-        d.polygon(
-            [
-                (300, 5),
-                (275, 55),
-                (325, 55)
-            ],
-            fill="white"
-        )
-
+        d.polygon([(300, 5), (275, 55), (325, 55)], fill="white")
         frames.append(img)
 
     out = BytesIO()
-
     frames[0].save(
         out,
         "GIF",
@@ -180,14 +132,11 @@ def roulette_gif(players, winner):
         duration=55,
         loop=0
     )
-
     out.seek(0)
-
     return out
 
 
 async def roulette(interaction):
-
     players = [
         interaction.user.display_name,
         "Nightfall 🤖",
@@ -196,38 +145,22 @@ async def roulette(interaction):
         "لاعب 4",
         "لاعب 5"
     ]
-
     winner = random.choice(players)
 
     await interaction.response.send_message(
-        embed=embed(
-            "🎰 Nightfall Roulette",
-            "🎡 **العجلة بدأت الدوران...**"
-        )
+        embed=embed("🎰 Nightfall Roulette", "🎡 **العجلة بدأت الدوران...**")
     )
 
-    gif = roulette_gif(
-        players,
-        winner
-    )
+    gif = roulette_gif(players, winner)
 
     await interaction.edit_original_response(
-        attachments=[
-            discord.File(
-                gif,
-                "roulette.gif"
-            )
-        ]
+        attachments=[discord.File(gif, "roulette.gif")]
     )
 
     await asyncio.sleep(4)
 
     await interaction.followup.send(
-        embed=embed(
-            "🏆 انتهت الجولة",
-            f"🎰 الفائز هو:\n\n# {winner}",
-            config.SUCCESS
-        )
+        embed=embed("🏆 انتهت الجولة", f"🎰 الفائز هو:\n\n# {winner}", config.SUCCESS)
     )
 
 
@@ -240,88 +173,51 @@ mafia = {}
 
 class MafiaView(discord.ui.View):
 
-    def __init__(self, channel):
-
+    def __init__(self, channel_id):
         super().__init__(timeout=300)
+        self.channel_id = channel_id
 
-        self.channel = channel
-
-    @discord.ui.button(
-        label="انضمام 👤",
-        style=discord.ButtonStyle.success
-    )
+    @discord.ui.button(label="انضمام 👤", style=discord.ButtonStyle.success)
     async def join(self, interaction, button):
+        game = mafia.get(self.channel_id)
+        if not game:
+            return await interaction.response.send_message("❌ انتهت اللعبة.", ephemeral=True)
 
-        game = mafia[self.channel]
-
-        if interaction.user.id in game["players"]:
-            return await interaction.response.send_message(
-                "⚠️ أنت داخل اللعبة بالفعل.",
-                ephemeral=True
-            )
+        if interaction.user.id in [p.id for p in game["players"]]:
+            return await interaction.response.send_message("⚠️ أنت داخل اللعبة بالفعل.", ephemeral=True)
 
         if len(game["players"]) >= 12:
-            return await interaction.response.send_message(
-                "❌ اللعبة ممتلئة.",
-                ephemeral=True
-            )
+            return await interaction.response.send_message("❌ اللعبة ممتلئة.", ephemeral=True)
 
-        game["players"].append(
-            interaction.user
-        )
+        game["players"].append(interaction.user)
 
+        players_list = "".join(f"• {p.display_name}\n" for p in game["players"])
         await interaction.response.edit_message(
-            embed=embed(
-                "🕵️ Nightfall Mafia",
-                f"""
-👥 اللاعبين: **{len(game["players"])}**
-
-{"".join(
-    f"• {p.display_name}\n"
-    for p in game["players"]
-)}
-
-الحد الأدنى: **4**
-"""
-            ),
+            embed=embed("🕵️ Nightfall Mafia", f"👥 اللاعبين: **{len(game['players'])}**\n\n{players_list}\nالحد الأدنى: **4**"),
             view=self
         )
 
-    @discord.ui.button(
-        label="بدء ▶️",
-        style=discord.ButtonStyle.primary
-    )
+    @discord.ui.button(label="بدء ▶️", style=discord.ButtonStyle.primary)
     async def start(self, interaction, button):
-
-        game = mafia[self.channel]
+        game = mafia.get(self.channel_id)
+        if not game:
+            return await interaction.response.send_message("❌ انتهت اللعبة.", ephemeral=True)
 
         if interaction.user.id != game["host"]:
-            return await interaction.response.send_message(
-                "❌ المضيف فقط يستطيع البدء.",
-                ephemeral=True
-            )
+            return await interaction.response.send_message("❌ المضيف فقط يستطيع البدء.", ephemeral=True)
 
         if len(game["players"]) < 4:
-            return await interaction.response.send_message(
-                "❌ تحتاج 4 لاعبين على الأقل.",
-                ephemeral=True
-            )
+            return await interaction.response.send_message("❌ تحتاج 4 لاعبين على الأقل.", ephemeral=True)
 
         players = game["players"][:]
         random.shuffle(players)
-
         roles = {}
 
-        mafia_count = max(
-            1,
-            len(players) // 4
-        )
-
+        mafia_count = max(1, len(players) // 4)
         for p in players[:mafia_count]:
             roles[p.id] = "🕵️ المافيا"
 
         remaining = players[mafia_count:]
-
         if remaining:
             roles[remaining.pop(0).id] = "👨‍⚕️ الطبيب"
 
@@ -332,38 +228,15 @@ class MafiaView(discord.ui.View):
             roles[p.id] = "👤 مواطن"
 
         for p in players:
-
             try:
-                await p.send(
-                    embed=embed(
-                        "🕵️ دورك في المافيا",
-                        f"""
-🎭 **دورك:**
-
-# {roles[p.id]}
-
-🤫 لا تخبر أي شخص.
-"""
-                    )
-                )
+                await p.send(embed=embed("🕵️ دورك في المافيا", f"🎭 **دورك:**\n\n# {roles[p.id]}\n\n🤫 لا تخبر أي شخص."))
             except:
                 pass
 
-        del mafia[self.channel]
+        del mafia[self.channel_id]
 
         await interaction.response.edit_message(
-            embed=embed(
-                "🕵️ المافيا بدأت!",
-                f"""
-👥 عدد اللاعبين:
-**{len(players)}**
-
-📩 تم إرسال الأدوار في الخاص.
-
-🤫 حظًا سعيدًا!
-""",
-                config.DANGER
-            ),
+            embed=embed("🕵️ المافيا بدأت!", f"👥 عدد اللاعبين:\n**{len(players)}**\n\n📩 تم إرسال الأدوار في الخاص.\n\n🤫 حظًا سعيدًا!", config.DANGER),
             view=None
         )
 
@@ -377,255 +250,127 @@ chairs = {}
 
 class ChairsLobby(discord.ui.View):
 
-    def __init__(self, channel):
-
+    def __init__(self, channel_id):
         super().__init__(timeout=300)
+        self.channel_id = channel_id
 
-        self.channel = channel
-
-    @discord.ui.button(
-        label="انضمام 👤",
-        style=discord.ButtonStyle.success
-    )
+    @discord.ui.button(label="انضمام 👤", style=discord.ButtonStyle.success)
     async def join(self, interaction, button):
+        game = chairs.get(self.channel_id)
+        if not game:
+            return await interaction.response.send_message("❌ انتهت اللعبة.", ephemeral=True)
 
-        game = chairs[self.channel]
+        if interaction.user.id in [p.id for p in game["players"]]:
+            return await interaction.response.send_message("⚠️ أنت داخل اللعبة.", ephemeral=True)
 
-        if interaction.user.id in [
-            p.id for p in game["players"]
-        ]:
-            return await interaction.response.send_message(
-                "⚠️ أنت داخل اللعبة.",
-                ephemeral=True
-            )
-
-        game["players"].append(
-            interaction.user
-        )
+        game["players"].append(interaction.user)
+        players_list = "".join(f"• {p.display_name}\n" for p in game["players"])
 
         await interaction.response.edit_message(
-            embed=embed(
-                "🪑 Musical Chairs",
-                f"""
-🎵 **لوبي الكراسي**
-
-👥 اللاعبين:
-**{len(game["players"])}**
-
-{"".join(
-    f"• {p.display_name}\n"
-    for p in game["players"]
-)}
-
-اضغط **بدء ▶️** عندما تكون جاهزًا.
-"""
-            ),
+            embed=embed("🪑 Musical Chairs", f"🎵 **لوبي الكراسي**\n\n👥 اللاعبين:\n**{len(game['players'])}**\n\n{players_list}\nاضغط **بدء ▶️** عندما تكون جاهزًا."),
             view=self
         )
 
-    @discord.ui.button(
-        label="بدء ▶️",
-        style=discord.ButtonStyle.primary
-    )
+    @discord.ui.button(label="بدء ▶️", style=discord.ButtonStyle.primary)
     async def start(self, interaction, button):
-
-        game = chairs[self.channel]
+        game = chairs.get(self.channel_id)
+        if not game:
+            return await interaction.response.send_message("❌ انتهت اللعبة.", ephemeral=True)
 
         if interaction.user.id != game["host"]:
-            return await interaction.response.send_message(
-                "❌ المضيف فقط.",
-                ephemeral=True
-            )
+            return await interaction.response.send_message("❌ المضيف فقط.", ephemeral=True)
 
         if len(game["players"]) < 2:
-            return await interaction.response.send_message(
-                "❌ تحتاج لاعبين على الأقل.",
-                ephemeral=True
-            )
+            return await interaction.response.send_message("❌ تحتاج لاعبين على الأقل.", ephemeral=True)
 
         await interaction.response.edit_message(
-            embed=embed(
-                "🪑 Musical Chairs",
-                "🎵 **الموسيقى بدأت...**"
-            ),
+            embed=embed("🪑 Musical Chairs", "🎵 **الموسيقى بدأت...**"),
             view=None
         )
 
-        await chair_round(
-            self.channel
-        )
+        asyncio.create_task(chair_round(interaction.channel))
 
 
 class ChairButtons(discord.ui.View):
 
-    def __init__(
-        self,
-        channel,
-        count
-    ):
-
+    def __init__(self, channel, count, game_ref):
         super().__init__(timeout=4)
-
         self.channel = channel
         self.taken = set()
+        self.game_ref = game_ref
 
         for i in range(count):
+            button = discord.ui.Button(label=f"🪑 كرسي {i+1}", style=discord.ButtonStyle.primary)
 
-            button = discord.ui.Button(
-                label=f"🪑 كرسي {i+1}",
-                style=discord.ButtonStyle.primary
-            )
-
-            async def callback(
-                interaction,
-                i=i
-            ):
-
-                game = chairs.get(
-                    self.channel
-                )
-
+            async def callback(interaction, idx=i, btn=button):
+                game = chairs.get(self.channel.id)
                 if not game:
                     return
 
-                if interaction.user.id not in [
-                    p.id for p in game["players"]
-                ]:
-                    return await interaction.response.send_message(
-                        "❌ أنت لست داخل اللعبة.",
-                        ephemeral=True
-                    )
+                if interaction.user.id not in [p.id for p in game["players"]]:
+                    return await interaction.response.send_message("❌ أنت لست داخل اللعبة.", ephemeral=True)
 
                 if interaction.user.id in self.taken:
-                    return await interaction.response.send_message(
-                        "🪑 أخذت كرسيًا بالفعل!",
-                        ephemeral=True
-                    )
+                    return await interaction.response.send_message("🪑 أخذت كرسيًا بالفعل!", ephemeral=True)
 
-                if i in [
-                    x[1] for x in self.taken
-                ]:
-                    return await interaction.response.send_message(
-                        "❌ هذا الكرسي محجوز!",
-                        ephemeral=True
-                    )
+                if idx in [x[1] for x in self.taken]:
+                    return await interaction.response.send_message("❌ هذا الكرسي محجوز!", ephemeral=True)
 
-                self.taken.add(
-                    (interaction.user.id, i)
-                )
+                self.taken.add((interaction.user.id, idx))
+                btn.disabled = True
 
-                button.disabled = True
-
-                await interaction.response.send_message(
-                    "🪑 **جلست!**",
-                    ephemeral=True
-                )
-
-                await interaction.message.edit(
-                    view=self
-                )
+                await interaction.response.send_message("🪑 **جلست!**", ephemeral=True)
+                try:
+                    await interaction.message.edit(view=self)
+                except:
+                    pass
 
             button.callback = callback
-
             self.add_item(button)
 
 
 async def chair_round(channel):
-
-    game = chairs.get(channel)
-
+    game = chairs.get(channel.id)
     if not game:
         return
 
     players = game["players"]
 
     if len(players) == 1:
-
         winner = players[0]
-
-        del chairs[channel]
-
-        ch = interaction_channel(channel)
-
-        if ch:
-            await ch.send(
-                embed=embed(
-                    "🏆 الفائز!",
-                    f"# {winner.display_name}\n\n🎉 فاز بـ Musical Chairs!",
-                    config.SUCCESS
-                )
-            )
-
+        del chairs[channel.id]
+        await channel.send(
+            embed=embed("🏆 الفائز!", f"# {winner.display_name}\n\n🎉 فاز بـ Musical Chairs!", config.SUCCESS)
+        )
         return
 
-    await asyncio.sleep(
-        random.uniform(2.5, 4)
-    )
-
+    await asyncio.sleep(random.uniform(2.5, 4))
     count = len(players) - 1
 
-    view = ChairButtons(
-        channel,
-        count
-    )
+    view = ChairButtons(channel, count, game)
 
-    ch = interaction_channel(channel)
-
-    if not ch:
-        return
-
-    message = await ch.send(
-        embed=embed(
-            "🚨 توقفت الموسيقى!",
-            f"""
-🪑 **اجلس بسرعة!**
-
-الكراسي: **{count}**
-
-⏱️ الوقت: **4 ثوانٍ**
-"""
-        ),
+    message = await channel.send(
+        embed=embed("🚨 توقفت الموسيقى!", f"🪑 **اجلس بسرعة!**\n\nالكراسي: **{count}**\n\n⏱️ الوقت: **4 ثوانٍ**"),
         view=view
     )
 
     await asyncio.sleep(4)
 
-    seated = {
-        uid for uid, chair in view.taken
-    }
-
-    available = [
-        p for p in players
-        if p.id not in seated
-    ]
+    seated = {uid for uid, chair in view.taken}
+    available = [p for p in players if p.id not in seated]
 
     if available:
+        loser = random.choice(available)
+        if loser in game["players"]:
+            game["players"].remove(loser)
 
-        loser = random.choice(
-            available
-        )
-
-        game["players"].remove(
-            loser
-        )
-
-        await ch.send(
-            embed=embed(
-                "💀 خرج لاعب!",
-                f"**{loser.display_name}** لم يجد كرسيًا!",
-                config.DANGER
-            )
+        await channel.send(
+            embed=embed("💀 خرج لاعب!", f"**{loser.display_name}** لم يجد كرسيًا!", config.DANGER)
         )
 
     view.stop()
-
     await asyncio.sleep(2)
-
-    await chair_round(channel)
-
-
-def interaction_channel(channel_id):
-    return None
+    asyncio.create_task(chair_round(channel))
 
 
 # =========================================================
@@ -642,46 +387,25 @@ countries = [
 class CountryView(discord.ui.View):
 
     def __init__(self, data):
-
         super().__init__(timeout=30)
-
         flag, answer, choices = data
 
         for choice in choices:
+            button = discord.ui.Button(label=choice, style=discord.ButtonStyle.secondary)
 
-            button = discord.ui.Button(
-                label=choice
-            )
-
-            async def callback(
-                interaction,
-                choice=choice
-            ):
-
+            async def callback(interaction, choice=choice):
                 if choice == answer:
-
                     await interaction.response.edit_message(
-                        embed=embed(
-                            "🎉 صحيح!",
-                            f"🏆 الإجابة هي **{answer}**",
-                            config.SUCCESS
-                        ),
+                        embed=embed("🎉 صحيح!", f"🏆 الإجابة هي **{answer}**", config.SUCCESS),
                         view=None
                     )
-
                 else:
-
                     await interaction.response.edit_message(
-                        embed=embed(
-                            "❌ خطأ!",
-                            f"الإجابة الصحيحة: **{answer}**",
-                            config.DANGER
-                        ),
+                        embed=embed("❌ خطأ!", f"الإجابة الصحيحة: **{answer}**", config.DANGER),
                         view=None
                     )
 
             button.callback = callback
-
             self.add_item(button)
 
 
@@ -692,66 +416,76 @@ class CountryView(discord.ui.View):
 class RPSView(discord.ui.View):
 
     def __init__(self):
-
         super().__init__(timeout=30)
-
         choices = ["حجر", "ورق", "مقص"]
 
         for choice in choices:
+            button = discord.ui.Button(label=choice, style=discord.ButtonStyle.primary)
 
-            button = discord.ui.Button(
-                label=choice
-            )
-
-            async def callback(
-                interaction,
-                choice=choice
-            ):
-
-                bot_choice = random.choice(
-                    choices
-                )
-
-                result = rps(
-                    choice,
-                    bot_choice
-                )
+            async def callback(interaction, choice=choice):
+                bot_choice = random.choice(choices)
+                result = rps(choice, bot_choice)
 
                 await interaction.response.edit_message(
                     embed=embed(
                         "✊ حجر ورق مقص",
-                        f"""
-👤 اختيارك: **{choice}**
-
-🤖 Nightfall: **{bot_choice}**
-
-🏆 **{result}**
-"""
+                        f"👤 اختيارك: **{choice}**\n\n🤖 Nightfall: **{bot_choice}**\n\n🏆 **{result}**"
                     ),
                     view=None
                 )
 
             button.callback = callback
-
             self.add_item(button)
 
 
 def rps(a, b):
-
     if a == b:
         return "تعادل 🤝"
+    wins = {"حجر": "مقص", "مقص": "ورق", "ورق": "حجر"}
+    return "أنت الفائز 🏆" if wins[a] == b else "Nightfall فاز 🤖"
 
-    wins = {
-        "حجر": "مقص",
-        "مقص": "ورق",
-        "ورق": "حجر"
-    }
 
-    return (
-        "أنت الفائز 🏆"
-        if wins[a] == b
-        else "Nightfall فاز 🤖"
-    )
+# =========================================================
+# 🚌 BUS COMPLETE (أتوبيس كومبليت)
+# =========================================================
+
+class BusView(discord.ui.View):
+    def __init__(self, letter):
+        super().__init__(timeout=60)
+        self.letter = letter
+
+    @discord.ui.button(label="إرسال كلمة ✍️", style=discord.ButtonStyle.success)
+    async def send_word(self, interaction, button):
+        await interaction.response.send_message(
+            f"✏️ اكتب في الشات كلمة تبدأ بالحرف: **{self.letter}** (تضم: إنسان، حيوان، نبات، جماد، بلاد)",
+            ephemeral=True
+        )
+
+
+# =========================================================
+# ❌⭕ XO & HOT XO
+# =========================================================
+
+class XoButton(discord.ui.Button):
+    def __init__(self, x, y):
+        super().__init__(style=discord.ButtonStyle.secondary, label="⬜", row=x)
+        self.x = x
+        self.y = y
+
+    async def callback(self, interaction: discord.Interaction):
+        if self.label != "⬜":
+            return await interaction.response.send_message("❌ الخانة محجوزة!", ephemeral=True)
+        self.label = "❌"
+        self.style = discord.ButtonStyle.danger
+        await interaction.response.edit_message(view=self.view)
+
+
+class XoView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=60)
+        for x in range(3):
+            for y in range(3):
+                self.add_item(XoButton(x, y))
 
 
 # =========================================================
@@ -764,170 +498,75 @@ async def start(interaction, game):
         return await roulette(interaction)
 
     if game == "mafia":
+        channel_id = interaction.channel_id
+        if channel_id in mafia:
+            return await interaction.response.send_message("❌ توجد لعبة مافيا بالفعل.", ephemeral=True)
 
-        channel = interaction.channel_id
-
-        if channel in mafia:
-            return await interaction.response.send_message(
-                "❌ توجد لعبة مافيا بالفعل.",
-                ephemeral=True
-            )
-
-        mafia[channel] = {
+        mafia[channel_id] = {
             "host": interaction.user.id,
             "players": [interaction.user]
         }
-
         return await interaction.response.send_message(
-            embed=embed(
-                "🕵️ Nightfall Mafia",
-                f"""
-👑 المضيف:
-**{interaction.user.display_name}**
-
-👥 اللاعبين: **1**
-
-اضغط **انضمام 👤**
-
-الحد الأدنى: **4 لاعبين**
-"""
-            ),
-            view=MafiaView(channel)
+            embed=embed("🕵️ Nightfall Mafia", f"👑 المضيف:\n**{interaction.user.display_name}**\n\n👥 اللاعبين: **1**\n\nاضغط **انضمام 👤**\n\nالحد الأدنى: **4 لاعبين**"),
+            view=MafiaView(channel_id)
         )
 
     if game == "chairs":
+        channel_id = interaction.channel_id
+        if channel_id in chairs:
+            return await interaction.response.send_message("❌ توجد لعبة كراسي بالفعل.", ephemeral=True)
 
-        channel = interaction.channel_id
-
-        if channel in chairs:
-            return await interaction.response.send_message(
-                "❌ توجد لعبة كراسي بالفعل.",
-                ephemeral=True
-            )
-
-        chairs[channel] = {
+        chairs[channel_id] = {
             "host": interaction.user.id,
             "players": [interaction.user]
         }
-
         return await interaction.response.send_message(
-            embed=embed(
-                "🪑 Musical Chairs",
-                f"""
-👑 المضيف:
-**{interaction.user.display_name}**
-
-👥 اللاعبين: **1**
-
-اضغط **انضمام 👤**
-
-الحد الأدنى: **2**
-"""
-            ),
-            view=ChairsLobby(channel)
+            embed=embed("🪑 Musical Chairs", f"👑 المضيف:\n**{interaction.user.display_name}**\n\n👥 اللاعبين: **1**\n\nاضغط **انضمام 👤**\n\nالحد الأدنى: **2**"),
+            view=ChairsLobby(channel_id)
         )
 
     if game == "country":
-
         data = random.choice(countries)
-
         return await interaction.response.send_message(
-            embed=embed(
-                "🌍 خمن الدولة",
-                f"""
-ما الدولة صاحبة العلم؟
-
-# {data[0]}
-
-👇 اختر الإجابة:
-"""
-            ),
+            embed=embed("🌍 خمن الدولة", f"ما الدولة صاحبة العلم؟\n\n# {data[0]}\n\n👇 اختر الإجابة:"),
             view=CountryView(data)
         )
 
     if game == "rps":
-
         return await interaction.response.send_message(
-            embed=embed(
-                "✊ حجر ورق مقص",
-                "اختر حركتك 👇"
-            ),
+            embed=embed("✊ حجر ورق مقص", "اختر حركتك 👇"),
             view=RPSView()
         )
 
     if game == "dice":
-
         a = random.randint(1, 6)
         b = random.randint(1, 6)
-
-        winner = (
-            interaction.user.display_name
-            if a > b
-            else "Nightfall 🤖"
-            if b > a
-            else "تعادل 🤝"
-        )
-
+        winner = interaction.user.display_name if a > b else "Nightfall 🤖" if b > a else "تعادل 🤝"
         return await interaction.response.send_message(
-            embed=embed(
-                "🎲 النرد",
-                f"""
-👤 **أنت:** `{a}`
-
-🤖 **Nightfall:** `{b}`
-
-🏆 **{winner}**
-"""
-            )
+            embed=embed("🎲 النرد", f"👤 **أنت:** `{a}`\n\n🤖 **Nightfall:** `{b}`\n\n🏆 **{winner}**")
         )
 
     if game == "hide":
-
         seeker = interaction.user.display_name
-
         return await interaction.response.send_message(
-            embed=embed(
-                "🫣 الغميضة",
-                f"""
-👀 الباحث:
-
-# {seeker}
-
-🏃 حاولوا الاختباء!
-"""
-            )
+            embed=embed("🫣 الغميضة", f"👀 الباحث:\n\n# {seeker}\n\n🏃 حاولوا الاختباء!")
         )
 
     if game == "replica":
-
         return await interaction.response.send_message(
-            embed=embed(
-                "🪞 Replica",
-                f"""
-🎯 تم اختيار:
-
-# {interaction.user.display_name}
-
-😂 حاول تقليده!
-"""
-            )
+            embed=embed("🪞 Replica", f"🎯 تم اختيار:\n\n# {interaction.user.display_name}\n\n😂 حاول تقليده!")
         )
 
     if game in ("xo", "hotxo"):
-
         return await interaction.response.send_message(
-            embed=embed(
-                "❌⭕ " + (
-                    "XO"
-                    if game == "xo"
-                    else "Hot XO"
-                ),
-                """
-⬜ ⬜ ⬜
-⬜ ⬜ ⬜
-⬜ ⬜ ⬜
+            embed=embed("❌⭕ " + ("XO" if game == "xo" else "Hot XO"), "🎮 اللعبة جاهزة، ابدأ اللعب بالضغط على المربعات!"),
+            view=XoView()
+        )
 
-🎮 اللعبة جاهزة!
-"""
-            )
+    if game == "bus":
+        letters = "أبتثجحخدذرزسشصضطظعغفقكلمنهوي"
+        selected_letter = random.choice(letters)
+        return await interaction.response.send_message(
+            embed=embed("🚌 أتوبيس كومبليت", f"الحرف الحائز على الاختيار:\n\n# 【 {selected_letter} 】\n\nتنافسوا الآن وأكملوا الأقسام (إنسان، حيوان، نبات، جماد، بلاد)!"),
+            view=BusView(selected_letter)
         )
