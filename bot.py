@@ -148,7 +148,7 @@ async def run_roulette_timer(cid, channel, msg, view):
     players_dict = game["players"]
     players_list = list(players_dict.values())
     
-    # تحميل صور جميع اللاعبين المشاركين وتمريرها مع الأسماء
+    # تحميل صور جميع اللاعبين المشاركين
     players_data = []
     for usr in players_list:
         avatar_img = await games.download_avatar(usr.display_avatar.url)
@@ -170,17 +170,19 @@ async def run_roulette_timer(cid, channel, msg, view):
     
     spin_msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير..."), file=file)
     
-    # انتظار انتهاء مدة الـ GIF
-    await asyncio.sleep(6)
+    # انتظار انتهاء مدة عرض الـ GIF بالكامل
+    await asyncio.sleep(6.5)
     
     try:
         await spin_msg.delete()
     except:
         pass
         
-    winner_embed = games.embed("فائز الروليت", f"مبروك للفائز:\n# {winner_name}", config.COLORS["success"])
+    # إرسال رسالة الفائز مع الصورة بوضوح
+    winner_embed = games.embed("🎉 فائز الروليت", f"مبروك للفائز:\n# {winner_user.mention}", config.COLORS["success"])
+    
     if winner_avatar:
-        avatar_io = discord.utils.BytesIO()
+        avatar_io = BytesIO()
         winner_avatar.save(avatar_io, format="PNG")
         avatar_io.seek(0)
         file_avatar = discord.File(avatar_io, filename="winner.png")
@@ -355,4 +357,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-        
+            
