@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 # =========================================================
-# الألعاب
+# أسماء الألعاب
 # =========================================================
 
 GAMES = {
@@ -14,7 +14,7 @@ GAMES = {
     "mafia": "🕵️ المافيا",
     "country": "🌍 خمن الدولة",
     "hide": "🫣 الغميضة",
-    "chairs": "🪑 الكراسي",
+    "chairs": "🪑 الكراسي الموسيقية",
     "dice": "🎲 النرد",
     "replica": "🪞 Replica",
     "rps": "✊ حجر ورق مقص",
@@ -24,7 +24,7 @@ GAMES = {
 
 
 # =========================================================
-# النرد
+# 🎲 النرد
 # =========================================================
 
 def roll_dice(players):
@@ -45,7 +45,7 @@ def roll_dice(players):
 
 
 # =========================================================
-# الروليت
+# 🎰 الروليت
 # =========================================================
 
 def roulette_winner(players):
@@ -57,198 +57,159 @@ def roulette_winner(players):
 
 def create_roulette_gif(players, winner):
     """
-    إنشاء عجلة روليت متحركة GIF.
-
-    players:
-        أسماء اللاعبين الموجودين في الجولة.
-
-    winner:
-        اللاعب الذي يجب أن تتوقف العجلة عليه.
+    ينشئ عجلة متحركة وتتوقف فعليًا على الفائز.
     """
 
-    if not players:
+    if not players or winner not in players:
         return None
 
-    # -----------------------------------------------------
-    # إعدادات العجلة
-    # -----------------------------------------------------
+    WIDTH = 700
+    HEIGHT = 700
 
-    size = 700
+    CENTER_X = WIDTH // 2
+    CENTER_Y = HEIGHT // 2
 
-    center = size // 2
+    RADIUS = 270
 
-    radius = 280
-
-    frames = []
-
-    # عدد الإطارات
-    frame_count = 55
-
-    # -----------------------------------------------------
-    # تحميل الخط
-    # -----------------------------------------------------
-
-    try:
-        font_big = ImageFont.truetype(
-            "DejaVuSans-Bold.ttf",
-            25
-        )
-
-        font_small = ImageFont.truetype(
-            "DejaVuSans.ttf",
-            20
-        )
-
-    except Exception:
-
-        font_big = ImageFont.load_default()
-        font_small = ImageFont.load_default()
-
-    # -----------------------------------------------------
-    # الفائز
-    # -----------------------------------------------------
-
-    winner_index = players.index(winner)
+    FRAME_COUNT = 80
+    FULL_TURNS = 7
 
     count = len(players)
 
-    segment_angle = 360 / count
+    segment = 360 / count
 
-    # -----------------------------------------------------
-    # دوران طويل قبل التوقف
-    # -----------------------------------------------------
+    winner_index = players.index(winner)
 
-    total_rotations = 6
-
-    # الزاوية التي تجعل الفائز أمام السهم
-    target_angle = (
-        winner_index * segment_angle
-        + segment_angle / 2
+    # مركز قطاع الفائز
+    winner_center = (
+        winner_index * segment
+        + segment / 2
     )
 
-    final_rotation = (
-        total_rotations * 360
-        + target_angle
+    # السهم موجود عند أعلى العجلة = -90°
+    #
+    # نريد مركز قطاع الفائز أن يصل إلى -90°
+    #
+    # الدوران النهائي:
+    target_rotation = (
+        -90
+        - winner_center
+        + FULL_TURNS * 360
     )
 
-    # -----------------------------------------------------
-    # إنشاء Frames
-    # -----------------------------------------------------
+    try:
+        font = ImageFont.truetype(
+            "DejaVuSans-Bold.ttf",
+            20
+        )
+    except Exception:
+        font = ImageFont.load_default()
 
-    for frame in range(frame_count):
+    try:
+        small_font = ImageFont.truetype(
+            "DejaVuSans-Bold.ttf",
+            17
+        )
+    except Exception:
+        small_font = font
 
-        progress = frame / (frame_count - 1)
+    colors = [
+        (237, 66, 69),
+        (88, 101, 242),
+        (87, 242, 135),
+        (254, 231, 92),
+        (235, 69, 158),
+        (32, 178, 170),
+        (255, 145, 77),
+        (155, 89, 182),
+    ]
 
-        # Ease Out
-        eased = 1 - (1 - progress) ** 4
+    frames = []
 
-        rotation = final_rotation * eased
+    for frame_number in range(FRAME_COUNT):
+
+        progress = frame_number / (FRAME_COUNT - 1)
+
+        # Ease Out قوي
+        eased = 1 - ((1 - progress) ** 4)
+
+        rotation = target_rotation * eased
 
         image = Image.new(
             "RGB",
-            (size, size),
-            (18, 18, 24)
+            (WIDTH, HEIGHT),
+            (18, 18, 25)
         )
 
         draw = ImageDraw.Draw(image)
 
-        # -------------------------------------------------
-        # الدائرة الخارجية
-        # -------------------------------------------------
-
+        # الحلقة الخارجية
         draw.ellipse(
             (
-                center - radius - 8,
-                center - radius - 8,
-                center + radius + 8,
-                center + radius + 8
+                CENTER_X - RADIUS - 12,
+                CENTER_Y - RADIUS - 12,
+                CENTER_X + RADIUS + 12,
+                CENTER_Y + RADIUS + 12
             ),
-            fill=(230, 230, 235)
+            fill=(235, 235, 240)
         )
 
-        draw.ellipse(
-            (
-                center - radius,
-                center - radius,
-                center + radius,
-                center + radius
-            ),
-            fill=(35, 35, 45)
-        )
-
-        # -------------------------------------------------
-        # قطاعات العجلة
-        # -------------------------------------------------
-
-        colors = [
-            (237, 66, 69),
-            (88, 101, 242),
-            (87, 242, 135),
-            (254, 231, 92),
-            (235, 69, 158),
-            (32, 178, 170),
-            (255, 145, 77),
-            (155, 89, 182)
-        ]
-
+        # القطاعات
         for i, player in enumerate(players):
 
-            start = (
+            start_angle = (
                 -90
-                + i * segment_angle
                 + rotation
+                + i * segment
             )
 
-            end = start + segment_angle
-
-            color = colors[i % len(colors)]
+            end_angle = (
+                start_angle
+                + segment
+            )
 
             draw.pieslice(
                 (
-                    center - radius,
-                    center - radius,
-                    center + radius,
-                    center + radius
+                    CENTER_X - RADIUS,
+                    CENTER_Y - RADIUS,
+                    CENTER_X + RADIUS,
+                    CENTER_Y + RADIUS
                 ),
-                start=start,
-                end=end,
-                fill=color,
+                start=start_angle,
+                end=end_angle,
+                fill=colors[i % len(colors)],
                 outline=(255, 255, 255),
                 width=3
             )
 
-            # -------------------------------------------------
-            # مكان اسم اللاعب
-            # -------------------------------------------------
-
-            middle = math.radians(
-                start + segment_angle / 2
+            # مكان الاسم
+            middle_angle = math.radians(
+                start_angle + segment / 2
             )
 
-            text_radius = radius * 0.62
+            text_radius = RADIUS * 0.63
 
             x = (
-                center
-                + math.cos(middle)
+                CENTER_X
+                + math.cos(middle_angle)
                 * text_radius
             )
 
             y = (
-                center
-                + math.sin(middle)
+                CENTER_Y
+                + math.sin(middle_angle)
                 * text_radius
             )
 
-            # تقصير الاسم الطويل
-            name = player
+            name = str(player)
 
             if len(name) > 12:
-                name = name[:12] + "…"
+                name = name[:12] + "..."
 
             bbox = draw.textbbox(
                 (0, 0),
                 name,
-                font=font_small
+                font=small_font
             )
 
             text_width = bbox[2] - bbox[0]
@@ -261,21 +222,20 @@ def create_roulette_gif(players, winner):
                 ),
                 name,
                 fill=(255, 255, 255),
-                font=font_small
+                font=small_font
             )
 
-        # -------------------------------------------------
         # دائرة المنتصف
-        # -------------------------------------------------
+        inner = 70
 
         draw.ellipse(
             (
-                center - 65,
-                center - 65,
-                center + 65,
-                center + 65
+                CENTER_X - inner,
+                CENTER_Y - inner,
+                CENTER_X + inner,
+                CENTER_Y + inner
             ),
-            fill=(20, 20, 28),
+            fill=(22, 22, 30),
             outline=(255, 255, 255),
             width=4
         )
@@ -285,70 +245,42 @@ def create_roulette_gif(players, winner):
         bbox = draw.textbbox(
             (0, 0),
             title,
-            font=font_big
+            font=font
         )
 
         draw.text(
             (
-                center - (bbox[2] - bbox[0]) / 2,
-                center - (bbox[3] - bbox[1]) / 2
+                CENTER_X -
+                (bbox[2] - bbox[0]) / 2,
+
+                CENTER_Y -
+                (bbox[3] - bbox[1]) / 2
             ),
             title,
             fill=(255, 255, 255),
-            font=font_big
+            font=font
         )
 
-        # -------------------------------------------------
         # السهم الثابت
-        # -------------------------------------------------
-
-        arrow = [
-            (center, 18),
-            (center - 25, 65),
-            (center + 25, 65)
-        ]
-
         draw.polygon(
-            arrow,
+            [
+                (CENTER_X, 10),
+                (CENTER_X - 28, 65),
+                (CENTER_X + 28, 65)
+            ],
             fill=(255, 255, 255)
         )
 
         draw.polygon(
             [
-                (center, 30),
-                (center - 12, 55),
-                (center + 12, 55)
+                (CENTER_X, 25),
+                (CENTER_X - 12, 52),
+                (CENTER_X + 12, 52)
             ],
             fill=(237, 66, 69)
         )
 
-        # -------------------------------------------------
-        # اسم اللعبة
-        # -------------------------------------------------
-
-        label = "🎰 ROULETTE"
-
-        bbox = draw.textbbox(
-            (0, 0),
-            label,
-            font=font_big
-        )
-
-        draw.text(
-            (
-                center - (bbox[2] - bbox[0]) / 2,
-                size - 55
-            ),
-            label,
-            fill=(255, 255, 255),
-            font=font_big
-        )
-
         frames.append(image)
-
-    # -----------------------------------------------------
-    # تحويل الإطارات إلى GIF
-    # -----------------------------------------------------
 
     output = BytesIO()
 
@@ -357,8 +289,9 @@ def create_roulette_gif(players, winner):
         format="GIF",
         save_all=True,
         append_images=frames[1:],
-        duration=45,
-        loop=0
+        duration=55,
+        loop=0,
+        disposal=2
     )
 
     output.seek(0)
@@ -367,7 +300,61 @@ def create_roulette_gif(players, winner):
 
 
 # =========================================================
-# خمن الدولة
+# 🕵️ المافيا
+# =========================================================
+
+def create_mafia_roles(players):
+    """
+    توزيع أدوار المافيا.
+
+    4-5 لاعبين:
+        1 مافيا
+        1 طبيب
+        الباقي مواطن
+
+    6+:
+        مافيا أكثر.
+    """
+
+    if len(players) < 4:
+        return None
+
+    shuffled = players.copy()
+
+    random.shuffle(shuffled)
+
+    roles = {}
+
+    mafia_count = max(
+        1,
+        len(players) // 4
+    )
+
+    # المافيا
+    for player in shuffled[:mafia_count]:
+        roles[player] = "🕵️ المافيا"
+
+    remaining = shuffled[mafia_count:]
+
+    # طبيب
+    if remaining:
+        doctor = remaining.pop(0)
+        roles[doctor] = "👨‍⚕️ الطبيب"
+
+    # محقق
+    if len(players) >= 6 and remaining:
+        detective = remaining.pop(0)
+        roles[detective] = "🔎 المحقق"
+
+    # مواطنون
+    for player in remaining:
+        roles[player] = "👤 مواطن"
+
+    return roles
+
+
+# =========================================================
+# 🌍 خمن الدولة
 # =========================================================
 
 COUNTRIES = [
@@ -422,10 +409,13 @@ def random_country():
 
 
 # =========================================================
-# الغميضة
+# 🫣 الغميضة
 # =========================================================
 
 def hide_and_seek(players):
+
+    if len(players) < 2:
+        return None, []
 
     seeker = random.choice(players)
 
@@ -439,33 +429,44 @@ def hide_and_seek(players):
 
 
 # =========================================================
-# الكراسي
+# 🪑 Musical Chairs
 # =========================================================
 
-def chairs_round(players):
+def create_chairs(number_of_players):
+    """
+    عدد الكراسي = اللاعبين - 1
+    """
 
-    shuffled = players.copy()
+    return max(1, number_of_players - 1)
 
-    random.shuffle(shuffled)
 
-    winner = shuffled[0]
+def choose_chair_winner(players, selected_chairs):
+    """
+    selected_chairs:
+        dict {user_id: chair_number}
 
-    eliminated = shuffled[-1]
+    اللاعب الذي اختار كرسيًا صحيحًا يبقى.
+    """
 
-    return winner, eliminated
+    winners = list(selected_chairs.keys())
+
+    return winners
 
 
 # =========================================================
-# Replica
+# 🪞 Replica
 # =========================================================
 
 def replica(players):
+
+    if not players:
+        return None
 
     return random.choice(players)
 
 
 # =========================================================
-# حجر ورق مقص
+# ✊ حجر ورق مقص
 # =========================================================
 
 def rps(player_choice, bot_choice):
@@ -479,18 +480,17 @@ def rps(player_choice, bot_choice):
         "مقص": "ورق"
     }
 
-    if wins[player_choice] == bot_choice:
+    if wins.get(player_choice) == bot_choice:
         return "أنت الفائز 🏆"
 
     return "Nightfall فاز 🤖"
 
 
 # =========================================================
-# XO
+# ❌⭕ XO
 # =========================================================
 
 def empty_xo():
-
     return ["⬜"] * 9
 
 
