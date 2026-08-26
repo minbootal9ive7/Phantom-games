@@ -28,9 +28,6 @@ def embed(title, text, color=None):
         color=color or config.COLORS["main"]
     )
 
-# =========================================================
-# 🎰 ROULETTE (بدون سهم جانبي + تصميم محسن)
-# =========================================================
 def create_roulette_gif(players, winner):
     W = H = 600
     C = 300
@@ -81,7 +78,6 @@ def create_roulette_gif(players, winner):
 
             d.text((x - tw / 2, y - th / 2), text, fill="white", font=font)
 
-        # أيقونة الوسط (png1.png)
         try:
             logo = Image.open("png1.png").convert("RGBA")
             logo = logo.resize((120, 120))
@@ -93,8 +89,6 @@ def create_roulette_gif(players, winner):
         except:
             d.ellipse((C-60, C-60, C+60, C+60), fill=(40, 40, 50), outline="white", width=3)
             d.text((C-35, C-10), "NIGHTFALL", fill="white", font=font)
-
-        # تم إزالة السهم من هنا تماماً بناءً على طلبك
 
         frames.append(img)
 
@@ -145,4 +139,4 @@ def create_mafia_roles(player_ids):
     for uid in remaining:
         roles[uid] = "Citizen"
     return roles
-        
+    
