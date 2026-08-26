@@ -1,12 +1,16 @@
+import asyncio
 import math
 import random
 from io import BytesIO
 
+import discord
 from PIL import Image, ImageDraw, ImageFont
+
+import config
 
 
 # =========================================================
-# أسماء الألعاب
+# الألعاب
 # =========================================================
 
 GAMES = {
@@ -23,95 +27,34 @@ GAMES = {
 }
 
 
-# =========================================================
-# 🎲 النرد
-# =========================================================
-
-def roll_dice(players):
-    results = {}
-
-    for player in players:
-        results[player] = random.randint(1, 6)
-
-    highest = max(results.values())
-
-    winners = [
-        player
-        for player, number in results.items()
-        if number == highest
-    ]
-
-    return results, winners
+def embed(title, text, color=None):
+    return discord.Embed(
+        title=title,
+        description=text,
+        color=color or config.COLOR
+    )
 
 
 # =========================================================
-# 🎰 الروليت
+# 🎰 ROULETTE
 # =========================================================
 
-def roulette_winner(players):
-    if not players:
-        return None
+def roulette_gif(players, winner):
 
-    return random.choice(players)
-
-
-def create_roulette_gif(players, winner):
-    """
-    ينشئ عجلة متحركة وتتوقف فعليًا على الفائز.
-    """
-
-    if not players or winner not in players:
-        return None
-
-    WIDTH = 700
-    HEIGHT = 700
-
-    CENTER_X = WIDTH // 2
-    CENTER_Y = HEIGHT // 2
-
-    RADIUS = 270
-
-    FRAME_COUNT = 80
-    FULL_TURNS = 7
+    W = H = 600
+    C = 300
+    R = 235
 
     count = len(players)
-
     segment = 360 / count
+    winner_i = players.index(winner)
 
-    winner_index = players.index(winner)
-
-    # مركز قطاع الفائز
-    winner_center = (
-        winner_index * segment
-        + segment / 2
-    )
-
-    # السهم موجود عند أعلى العجلة = -90°
-    #
-    # نريد مركز قطاع الفائز أن يصل إلى -90°
-    #
-    # الدوران النهائي:
-    target_rotation = (
+    # جعل الفائز أمام السهم
+    target = (
         -90
-        - winner_center
-        + FULL_TURNS * 360
+        - (winner_i * segment + segment / 2)
+        + 360 * 7
     )
-
-    try:
-        font = ImageFont.truetype(
-            "DejaVuSans-Bold.ttf",
-            20
-        )
-    except Exception:
-        font = ImageFont.load_default()
-
-    try:
-        small_font = ImageFont.truetype(
-            "DejaVuSans-Bold.ttf",
-            17
-        )
-    except Exception:
-        small_font = font
 
     colors = [
         (237, 66, 69),
@@ -119,404 +62,872 @@ def create_roulette_gif(players, winner):
         (87, 242, 135),
         (254, 231, 92),
         (235, 69, 158),
-        (32, 178, 170),
-        (255, 145, 77),
-        (155, 89, 182),
+        (32, 178, 170)
     ]
+
+    try:
+        font = ImageFont.truetype(
+            "DejaVuSans-Bold.ttf", 18
+        )
+    except:
+        font = ImageFont.load_default()
 
     frames = []
 
-    for frame_number in range(FRAME_COUNT):
+    for n in range(70):
 
-        progress = frame_number / (FRAME_COUNT - 1)
+        p = n / 69
 
-        # Ease Out قوي
-        eased = 1 - ((1 - progress) ** 4)
+        # تباطؤ تدريجي
+        ease = 1 - (1 - p) ** 4
 
-        rotation = target_rotation * eased
+        rotation = target * ease
 
-        image = Image.new(
+        img = Image.new(
             "RGB",
-            (WIDTH, HEIGHT),
+            (W, H),
             (18, 18, 25)
         )
 
-        draw = ImageDraw.Draw(image)
+        d = ImageDraw.Draw(img)
 
-        # الحلقة الخارجية
-        draw.ellipse(
-            (
-                CENTER_X - RADIUS - 12,
-                CENTER_Y - RADIUS - 12,
-                CENTER_X + RADIUS + 12,
-                CENTER_Y + RADIUS + 12
-            ),
-            fill=(235, 235, 240)
-        )
+        for i, name in enumerate(players):
 
-        # القطاعات
-        for i, player in enumerate(players):
-
-            start_angle = (
+            start = (
                 -90
                 + rotation
                 + i * segment
             )
 
-            end_angle = (
-                start_angle
-                + segment
-            )
+            end = start + segment
 
-            draw.pieslice(
+            d.pieslice(
                 (
-                    CENTER_X - RADIUS,
-                    CENTER_Y - RADIUS,
-                    CENTER_X + RADIUS,
-                    CENTER_Y + RADIUS
+                    C-R,
+                    C-R,
+                    C+R,
+                    C+R
                 ),
-                start=start_angle,
-                end=end_angle,
+                start,
+                end,
                 fill=colors[i % len(colors)],
-                outline=(255, 255, 255),
-                width=3
+                outline="white",
+                width=2
             )
 
-            # مكان الاسم
-            middle_angle = math.radians(
-                start_angle + segment / 2
+            a = math.radians(
+                start + segment / 2
             )
 
-            text_radius = RADIUS * 0.63
+            x = C + math.cos(a) * R * .62
+            y = C + math.sin(a) * R * .62
 
-            x = (
-                CENTER_X
-                + math.cos(middle_angle)
-                * text_radius
-            )
+            text = str(name)
 
-            y = (
-                CENTER_Y
-                + math.sin(middle_angle)
-                * text_radius
-            )
+            if len(text) > 11:
+                text = text[:11] + "…"
 
-            name = str(player)
-
-            if len(name) > 12:
-                name = name[:12] + "..."
-
-            bbox = draw.textbbox(
+            box = d.textbbox(
                 (0, 0),
-                name,
-                font=small_font
+                text,
+                font=font
             )
 
-            text_width = bbox[2] - bbox[0]
-            text_height = bbox[3] - bbox[1]
-
-            draw.text(
+            d.text(
                 (
-                    x - text_width / 2,
-                    y - text_height / 2
+                    x - (box[2]-box[0])/2,
+                    y - (box[3]-box[1])/2
                 ),
-                name,
-                fill=(255, 255, 255),
-                font=small_font
+                text,
+                fill="white",
+                font=font
             )
 
-        # دائرة المنتصف
-        inner = 70
-
-        draw.ellipse(
-            (
-                CENTER_X - inner,
-                CENTER_Y - inner,
-                CENTER_X + inner,
-                CENTER_Y + inner
-            ),
-            fill=(22, 22, 30),
-            outline=(255, 255, 255),
+        # المنتصف
+        d.ellipse(
+            (235, 235, 365, 365),
+            fill=(20, 20, 28),
+            outline="white",
             width=4
         )
 
-        title = "NIGHTFALL"
-
-        bbox = draw.textbbox(
-            (0, 0),
-            title,
+        d.text(
+            (263, 288),
+            "NIGHTFALL",
+            fill="white",
             font=font
         )
 
-        draw.text(
-            (
-                CENTER_X -
-                (bbox[2] - bbox[0]) / 2,
-
-                CENTER_Y -
-                (bbox[3] - bbox[1]) / 2
-            ),
-            title,
-            fill=(255, 255, 255),
-            font=font
-        )
-
-        # السهم الثابت
-        draw.polygon(
+        # السهم
+        d.polygon(
             [
-                (CENTER_X, 10),
-                (CENTER_X - 28, 65),
-                (CENTER_X + 28, 65)
+                (300, 5),
+                (275, 55),
+                (325, 55)
             ],
-            fill=(255, 255, 255)
+            fill="white"
         )
 
-        draw.polygon(
-            [
-                (CENTER_X, 25),
-                (CENTER_X - 12, 52),
-                (CENTER_X + 12, 52)
-            ],
-            fill=(237, 66, 69)
-        )
+        frames.append(img)
 
-        frames.append(image)
-
-    output = BytesIO()
+    out = BytesIO()
 
     frames[0].save(
-        output,
-        format="GIF",
+        out,
+        "GIF",
         save_all=True,
         append_images=frames[1:],
         duration=55,
-        loop=0,
-        disposal=2
+        loop=0
     )
 
-    output.seek(0)
+    out.seek(0)
 
-    return output
+    return out
 
 
-# =========================================================
-# 🕵️ المافيا
-# =========================================================
+async def roulette(interaction):
 
-def create_mafia_roles(players):
-    """
-    توزيع أدوار المافيا.
+    players = [
+        interaction.user.display_name,
+        "Nightfall 🤖",
+        "لاعب 2",
+        "لاعب 3",
+        "لاعب 4",
+        "لاعب 5"
+    ]
 
-    4-5 لاعبين:
-        1 مافيا
-        1 طبيب
-        الباقي مواطن
+    winner = random.choice(players)
 
-    6+:
-        مافيا أكثر.
-    """
-
-    if len(players) < 4:
-        return None
-
-    shuffled = players.copy()
-
-    random.shuffle(shuffled)
-
-    roles = {}
-
-    mafia_count = max(
-        1,
-        len(players) // 4
+    await interaction.response.send_message(
+        embed=embed(
+            "🎰 Nightfall Roulette",
+            "🎡 **العجلة بدأت الدوران...**"
+        )
     )
 
-    # المافيا
-    for player in shuffled[:mafia_count]:
-        roles[player] = "🕵️ المافيا"
+    gif = roulette_gif(
+        players,
+        winner
+    )
 
-    remaining = shuffled[mafia_count:]
+    await interaction.edit_original_response(
+        attachments=[
+            discord.File(
+                gif,
+                "roulette.gif"
+            )
+        ]
+    )
 
-    # طبيب
-    if remaining:
-        doctor = remaining.pop(0)
-        roles[doctor] = "👨‍⚕️ الطبيب"
+    await asyncio.sleep(4)
 
-    # محقق
-    if len(players) >= 6 and remaining:
-        detective = remaining.pop(0)
-        roles[detective] = "🔎 المحقق"
-
-    # مواطنون
-    for player in remaining:
-        roles[player] = "👤 مواطن"
-
-    return roles
+    await interaction.followup.send(
+        embed=embed(
+            "🏆 انتهت الجولة",
+            f"🎰 الفائز هو:\n\n# {winner}",
+            config.SUCCESS
+        )
+    )
 
 
 # =========================================================
-# 🌍 خمن الدولة
+# 🕵️ MAFIA
 # =========================================================
 
-COUNTRIES = [
-    {
-        "name": "مصر",
-        "flag": "🇪🇬",
-        "choices": [
-            "مصر",
-            "اليابان",
-            "فرنسا",
-            "البرازيل"
-        ]
-    },
+mafia = {}
 
-    {
-        "name": "اليابان",
-        "flag": "🇯🇵",
-        "choices": [
-            "الهند",
-            "اليابان",
-            "كندا",
-            "إسبانيا"
-        ]
-    },
 
-    {
-        "name": "فرنسا",
-        "flag": "🇫🇷",
-        "choices": [
-            "فرنسا",
-            "مصر",
-            "تركيا",
-            "إيطاليا"
-        ]
-    },
+class MafiaView(discord.ui.View):
 
-    {
-        "name": "البرازيل",
-        "flag": "🇧🇷",
-        "choices": [
-            "الأرجنتين",
-            "البرازيل",
-            "ألمانيا",
-            "المكسيك"
-        ]
+    def __init__(self, channel):
+
+        super().__init__(timeout=300)
+
+        self.channel = channel
+
+    @discord.ui.button(
+        label="انضمام 👤",
+        style=discord.ButtonStyle.success
+    )
+    async def join(self, interaction, button):
+
+        game = mafia[self.channel]
+
+        if interaction.user.id in game["players"]:
+            return await interaction.response.send_message(
+                "⚠️ أنت داخل اللعبة بالفعل.",
+                ephemeral=True
+            )
+
+        if len(game["players"]) >= 12:
+            return await interaction.response.send_message(
+                "❌ اللعبة ممتلئة.",
+                ephemeral=True
+            )
+
+        game["players"].append(
+            interaction.user
+        )
+
+        await interaction.response.edit_message(
+            embed=embed(
+                "🕵️ Nightfall Mafia",
+                f"""
+👥 اللاعبين: **{len(game["players"])}**
+
+{"".join(
+    f"• {p.display_name}\n"
+    for p in game["players"]
+)}
+
+الحد الأدنى: **4**
+"""
+            ),
+            view=self
+        )
+
+    @discord.ui.button(
+        label="بدء ▶️",
+        style=discord.ButtonStyle.primary
+    )
+    async def start(self, interaction, button):
+
+        game = mafia[self.channel]
+
+        if interaction.user.id != game["host"]:
+            return await interaction.response.send_message(
+                "❌ المضيف فقط يستطيع البدء.",
+                ephemeral=True
+            )
+
+        if len(game["players"]) < 4:
+            return await interaction.response.send_message(
+                "❌ تحتاج 4 لاعبين على الأقل.",
+                ephemeral=True
+            )
+
+        players = game["players"][:]
+        random.shuffle(players)
+
+        roles = {}
+
+        mafia_count = max(
+            1,
+            len(players) // 4
+        )
+
+        for p in players[:mafia_count]:
+            roles[p.id] = "🕵️ المافيا"
+
+        remaining = players[mafia_count:]
+
+        if remaining:
+            roles[remaining.pop(0).id] = "👨‍⚕️ الطبيب"
+
+        if len(players) >= 6 and remaining:
+            roles[remaining.pop(0).id] = "🔎 المحقق"
+
+        for p in remaining:
+            roles[p.id] = "👤 مواطن"
+
+        for p in players:
+
+            try:
+                await p.send(
+                    embed=embed(
+                        "🕵️ دورك في المافيا",
+                        f"""
+🎭 **دورك:**
+
+# {roles[p.id]}
+
+🤫 لا تخبر أي شخص.
+"""
+                    )
+                )
+            except:
+                pass
+
+        del mafia[self.channel]
+
+        await interaction.response.edit_message(
+            embed=embed(
+                "🕵️ المافيا بدأت!",
+                f"""
+👥 عدد اللاعبين:
+**{len(players)}**
+
+📩 تم إرسال الأدوار في الخاص.
+
+🤫 حظًا سعيدًا!
+""",
+                config.DANGER
+            ),
+            view=None
+        )
+
+
+# =========================================================
+# 🪑 MUSICAL CHAIRS
+# =========================================================
+
+chairs = {}
+
+
+class ChairsLobby(discord.ui.View):
+
+    def __init__(self, channel):
+
+        super().__init__(timeout=300)
+
+        self.channel = channel
+
+    @discord.ui.button(
+        label="انضمام 👤",
+        style=discord.ButtonStyle.success
+    )
+    async def join(self, interaction, button):
+
+        game = chairs[self.channel]
+
+        if interaction.user.id in [
+            p.id for p in game["players"]
+        ]:
+            return await interaction.response.send_message(
+                "⚠️ أنت داخل اللعبة.",
+                ephemeral=True
+            )
+
+        game["players"].append(
+            interaction.user
+        )
+
+        await interaction.response.edit_message(
+            embed=embed(
+                "🪑 Musical Chairs",
+                f"""
+🎵 **لوبي الكراسي**
+
+👥 اللاعبين:
+**{len(game["players"])}**
+
+{"".join(
+    f"• {p.display_name}\n"
+    for p in game["players"]
+)}
+
+اضغط **بدء ▶️** عندما تكون جاهزًا.
+"""
+            ),
+            view=self
+        )
+
+    @discord.ui.button(
+        label="بدء ▶️",
+        style=discord.ButtonStyle.primary
+    )
+    async def start(self, interaction, button):
+
+        game = chairs[self.channel]
+
+        if interaction.user.id != game["host"]:
+            return await interaction.response.send_message(
+                "❌ المضيف فقط.",
+                ephemeral=True
+            )
+
+        if len(game["players"]) < 2:
+            return await interaction.response.send_message(
+                "❌ تحتاج لاعبين على الأقل.",
+                ephemeral=True
+            )
+
+        await interaction.response.edit_message(
+            embed=embed(
+                "🪑 Musical Chairs",
+                "🎵 **الموسيقى بدأت...**"
+            ),
+            view=None
+        )
+
+        await chair_round(
+            self.channel
+        )
+
+
+class ChairButtons(discord.ui.View):
+
+    def __init__(
+        self,
+        channel,
+        count
+    ):
+
+        super().__init__(timeout=4)
+
+        self.channel = channel
+        self.taken = set()
+
+        for i in range(count):
+
+            button = discord.ui.Button(
+                label=f"🪑 كرسي {i+1}",
+                style=discord.ButtonStyle.primary
+            )
+
+            async def callback(
+                interaction,
+                i=i
+            ):
+
+                game = chairs.get(
+                    self.channel
+                )
+
+                if not game:
+                    return
+
+                if interaction.user.id not in [
+                    p.id for p in game["players"]
+                ]:
+                    return await interaction.response.send_message(
+                        "❌ أنت لست داخل اللعبة.",
+                        ephemeral=True
+                    )
+
+                if interaction.user.id in self.taken:
+                    return await interaction.response.send_message(
+                        "🪑 أخذت كرسيًا بالفعل!",
+                        ephemeral=True
+                    )
+
+                if i in [
+                    x[1] for x in self.taken
+                ]:
+                    return await interaction.response.send_message(
+                        "❌ هذا الكرسي محجوز!",
+                        ephemeral=True
+                    )
+
+                self.taken.add(
+                    (interaction.user.id, i)
+                )
+
+                button.disabled = True
+
+                await interaction.response.send_message(
+                    "🪑 **جلست!**",
+                    ephemeral=True
+                )
+
+                await interaction.message.edit(
+                    view=self
+                )
+
+            button.callback = callback
+
+            self.add_item(button)
+
+
+async def chair_round(channel):
+
+    game = chairs.get(channel)
+
+    if not game:
+        return
+
+    players = game["players"]
+
+    if len(players) == 1:
+
+        winner = players[0]
+
+        del chairs[channel]
+
+        ch = interaction_channel(channel)
+
+        if ch:
+            await ch.send(
+                embed=embed(
+                    "🏆 الفائز!",
+                    f"# {winner.display_name}\n\n🎉 فاز بـ Musical Chairs!",
+                    config.SUCCESS
+                )
+            )
+
+        return
+
+    await asyncio.sleep(
+        random.uniform(2.5, 4)
+    )
+
+    count = len(players) - 1
+
+    view = ChairButtons(
+        channel,
+        count
+    )
+
+    ch = interaction_channel(channel)
+
+    if not ch:
+        return
+
+    message = await ch.send(
+        embed=embed(
+            "🚨 توقفت الموسيقى!",
+            f"""
+🪑 **اجلس بسرعة!**
+
+الكراسي: **{count}**
+
+⏱️ الوقت: **4 ثوانٍ**
+"""
+        ),
+        view=view
+    )
+
+    await asyncio.sleep(4)
+
+    seated = {
+        uid for uid, chair in view.taken
     }
+
+    available = [
+        p for p in players
+        if p.id not in seated
+    ]
+
+    if available:
+
+        loser = random.choice(
+            available
+        )
+
+        game["players"].remove(
+            loser
+        )
+
+        await ch.send(
+            embed=embed(
+                "💀 خرج لاعب!",
+                f"**{loser.display_name}** لم يجد كرسيًا!",
+                config.DANGER
+            )
+        )
+
+    view.stop()
+
+    await asyncio.sleep(2)
+
+    await chair_round(channel)
+
+
+def interaction_channel(channel_id):
+    return None
+
+
+# =========================================================
+# 🌍 COUNTRY
+# =========================================================
+
+countries = [
+    ("🇪🇬", "مصر", ["مصر", "اليابان", "فرنسا", "البرازيل"]),
+    ("🇯🇵", "اليابان", ["الهند", "اليابان", "كندا", "إسبانيا"]),
+    ("🇫🇷", "فرنسا", ["فرنسا", "مصر", "تركيا", "إيطاليا"]),
 ]
 
 
-def random_country():
-    return random.choice(COUNTRIES)
+class CountryView(discord.ui.View):
+
+    def __init__(self, data):
+
+        super().__init__(timeout=30)
+
+        flag, answer, choices = data
+
+        for choice in choices:
+
+            button = discord.ui.Button(
+                label=choice
+            )
+
+            async def callback(
+                interaction,
+                choice=choice
+            ):
+
+                if choice == answer:
+
+                    await interaction.response.edit_message(
+                        embed=embed(
+                            "🎉 صحيح!",
+                            f"🏆 الإجابة هي **{answer}**",
+                            config.SUCCESS
+                        ),
+                        view=None
+                    )
+
+                else:
+
+                    await interaction.response.edit_message(
+                        embed=embed(
+                            "❌ خطأ!",
+                            f"الإجابة الصحيحة: **{answer}**",
+                            config.DANGER
+                        ),
+                        view=None
+                    )
+
+            button.callback = callback
+
+            self.add_item(button)
 
 
 # =========================================================
-# 🫣 الغميضة
+# ✊ RPS
 # =========================================================
 
-def hide_and_seek(players):
+class RPSView(discord.ui.View):
 
-    if len(players) < 2:
-        return None, []
+    def __init__(self):
 
-    seeker = random.choice(players)
+        super().__init__(timeout=30)
 
-    hidden = [
-        player
-        for player in players
-        if player != seeker
-    ]
+        choices = ["حجر", "ورق", "مقص"]
 
-    return seeker, hidden
+        for choice in choices:
 
+            button = discord.ui.Button(
+                label=choice
+            )
 
-# =========================================================
-# 🪑 Musical Chairs
-# =========================================================
+            async def callback(
+                interaction,
+                choice=choice
+            ):
 
-def create_chairs(number_of_players):
-    """
-    عدد الكراسي = اللاعبين - 1
-    """
+                bot_choice = random.choice(
+                    choices
+                )
 
-    return max(1, number_of_players - 1)
+                result = rps(
+                    choice,
+                    bot_choice
+                )
 
+                await interaction.response.edit_message(
+                    embed=embed(
+                        "✊ حجر ورق مقص",
+                        f"""
+👤 اختيارك: **{choice}**
 
-def choose_chair_winner(players, selected_chairs):
-    """
-    selected_chairs:
-        dict {user_id: chair_number}
+🤖 Nightfall: **{bot_choice}**
 
-    اللاعب الذي اختار كرسيًا صحيحًا يبقى.
-    """
+🏆 **{result}**
+"""
+                    ),
+                    view=None
+                )
 
-    winners = list(selected_chairs.keys())
+            button.callback = callback
 
-    return winners
-
-
-# =========================================================
-# 🪞 Replica
-# =========================================================
-
-def replica(players):
-
-    if not players:
-        return None
-
-    return random.choice(players)
+            self.add_item(button)
 
 
-# =========================================================
-# ✊ حجر ورق مقص
-# =========================================================
+def rps(a, b):
 
-def rps(player_choice, bot_choice):
-
-    if player_choice == bot_choice:
+    if a == b:
         return "تعادل 🤝"
 
     wins = {
         "حجر": "مقص",
-        "ورق": "حجر",
-        "مقص": "ورق"
+        "مقص": "ورق",
+        "ورق": "حجر"
     }
 
-    if wins.get(player_choice) == bot_choice:
-        return "أنت الفائز 🏆"
-
-    return "Nightfall فاز 🤖"
+    return (
+        "أنت الفائز 🏆"
+        if wins[a] == b
+        else "Nightfall فاز 🤖"
+    )
 
 
 # =========================================================
-# ❌⭕ XO
+# تشغيل الألعاب
 # =========================================================
 
-def empty_xo():
-    return ["⬜"] * 9
+async def start(interaction, game):
 
+    if game == "roulette":
+        return await roulette(interaction)
 
-def check_xo(board):
+    if game == "mafia":
 
-    combinations = [
-        (0, 1, 2),
-        (3, 4, 5),
-        (6, 7, 8),
-        (0, 3, 6),
-        (1, 4, 7),
-        (2, 5, 8),
-        (0, 4, 8),
-        (2, 4, 6)
-    ]
+        channel = interaction.channel_id
 
-    for a, b, c in combinations:
+        if channel in mafia:
+            return await interaction.response.send_message(
+                "❌ توجد لعبة مافيا بالفعل.",
+                ephemeral=True
+            )
 
-        if (
-            board[a] != "⬜"
-            and board[a] == board[b]
-            and board[a] == board[c]
-        ):
-            return board[a]
+        mafia[channel] = {
+            "host": interaction.user.id,
+            "players": [interaction.user]
+        }
 
-    if "⬜" not in board:
-        return "تعادل"
+        return await interaction.response.send_message(
+            embed=embed(
+                "🕵️ Nightfall Mafia",
+                f"""
+👑 المضيف:
+**{interaction.user.display_name}**
 
-    return None
+👥 اللاعبين: **1**
+
+اضغط **انضمام 👤**
+
+الحد الأدنى: **4 لاعبين**
+"""
+            ),
+            view=MafiaView(channel)
+        )
+
+    if game == "chairs":
+
+        channel = interaction.channel_id
+
+        if channel in chairs:
+            return await interaction.response.send_message(
+                "❌ توجد لعبة كراسي بالفعل.",
+                ephemeral=True
+            )
+
+        chairs[channel] = {
+            "host": interaction.user.id,
+            "players": [interaction.user]
+        }
+
+        return await interaction.response.send_message(
+            embed=embed(
+                "🪑 Musical Chairs",
+                f"""
+👑 المضيف:
+**{interaction.user.display_name}**
+
+👥 اللاعبين: **1**
+
+اضغط **انضمام 👤**
+
+الحد الأدنى: **2**
+"""
+            ),
+            view=ChairsLobby(channel)
+        )
+
+    if game == "country":
+
+        data = random.choice(countries)
+
+        return await interaction.response.send_message(
+            embed=embed(
+                "🌍 خمن الدولة",
+                f"""
+ما الدولة صاحبة العلم؟
+
+# {data[0]}
+
+👇 اختر الإجابة:
+"""
+            ),
+            view=CountryView(data)
+        )
+
+    if game == "rps":
+
+        return await interaction.response.send_message(
+            embed=embed(
+                "✊ حجر ورق مقص",
+                "اختر حركتك 👇"
+            ),
+            view=RPSView()
+        )
+
+    if game == "dice":
+
+        a = random.randint(1, 6)
+        b = random.randint(1, 6)
+
+        winner = (
+            interaction.user.display_name
+            if a > b
+            else "Nightfall 🤖"
+            if b > a
+            else "تعادل 🤝"
+        )
+
+        return await interaction.response.send_message(
+            embed=embed(
+                "🎲 النرد",
+                f"""
+👤 **أنت:** `{a}`
+
+🤖 **Nightfall:** `{b}`
+
+🏆 **{winner}**
+"""
+            )
+        )
+
+    if game == "hide":
+
+        seeker = interaction.user.display_name
+
+        return await interaction.response.send_message(
+            embed=embed(
+                "🫣 الغميضة",
+                f"""
+👀 الباحث:
+
+# {seeker}
+
+🏃 حاولوا الاختباء!
+"""
+            )
+        )
+
+    if game == "replica":
+
+        return await interaction.response.send_message(
+            embed=embed(
+                "🪞 Replica",
+                f"""
+🎯 تم اختيار:
+
+# {interaction.user.display_name}
+
+😂 حاول تقليده!
+"""
+            )
+        )
+
+    if game in ("xo", "hotxo"):
+
+        return await interaction.response.send_message(
+            embed=embed(
+                "❌⭕ " + (
+                    "XO"
+                    if game == "xo"
+                    else "Hot XO"
+                ),
+                """
+⬜ ⬜ ⬜
+⬜ ⬜ ⬜
+⬜ ⬜ ⬜
+
+🎮 اللعبة جاهزة!
+"""
+            )
+        )
