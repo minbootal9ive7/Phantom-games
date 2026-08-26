@@ -130,11 +130,13 @@ async def run_roulette_timer(cid, channel, msg, view):
     if not game or not game["players"]: return
     
     players_list = list(game["players"].values())
+    
+    # مسح رسالة اللوبي بعد انتهاء الـ 20 ثانية في جميع الحالات
+    try: await msg.delete()
+    except: pass
+
     if len(players_list) < 2:
-        try:
-            await msg.edit(embed=games.embed("إلغاء الروليت", "تم إلغاء اللعبة لعدم اكتمال الحد الأدنى من اللاعبين (مطلوب لاعبان على الأقل)."), view=None)
-        except:
-            pass
+        await channel.send(embed=games.embed("إلغاء الروليت", "تم إلغاء اللعبة لعدم اكتمال الحد الأدنى من اللاعبين (مطلوب لاعبان على الأقل)."))
         return
 
     players_data = []
@@ -142,12 +144,9 @@ async def run_roulette_timer(cid, channel, msg, view):
         try: img = await games.download_avatar(usr.display_avatar.url)
         except: img = None
         players_data.append({"name": usr.display_name, "user": usr, "avatar": img})
+    
     winner_name = games.roulette_winner([p["name"] for p in players_data])
     winner_user = next((p["user"] for p in players_data if p["name"] == winner_name), players_list[0])
-    
-    # مسح رسالة اللوبي القديمة
-    try: await msg.delete()
-    except: pass
 
     try:
         spin_msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير..."), file=discord.File(games.create_roulette_gif(players_data, winner_name), filename="roulette.gif"))
@@ -156,7 +155,7 @@ async def run_roulette_timer(cid, channel, msg, view):
     
     await asyncio.sleep(6.5)
     
-    # مسح رسالة الدوران (الجيف) وإرسال النتيجة مع زر الإعادة
+    # مسح رسالة الدوران (الجيف) بعد انتهائه
     try: await spin_msg.delete()
     except: pass
 
@@ -176,7 +175,6 @@ class RouletteRestartView(discord.ui.View):
         if cid in roulette_games:
             return await i.response.send_message("توجد لعبة روليت تعمل بالفعل.", ephemeral=True)
         
-        # إعادة إنشاء الروليت بنفس اللاعبين القدامى تلقائياً أو فتح لوبي جديد
         players_dict = {p.id: p for p in self.previous_players}
         roulette_games[cid] = {"host": i.user.id, "players": players_dict, "started": False}
         
@@ -350,4 +348,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-            
+        
