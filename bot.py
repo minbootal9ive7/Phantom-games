@@ -34,6 +34,7 @@ async def on_message(message):
         target_letter = game_data["letter"].lower()
         content = message.content.strip().lower()
 
+        # التحقق الدقيق: إذا بدأت بالحرف المطلوب
         if content.startswith(target_letter) and len(content) > 1:
             bus_games.pop(cid, None)
             new_letter = random.choice("abcdefghijklmnopqrstuvwxyz")
@@ -42,6 +43,12 @@ async def on_message(message):
             embed_res = games.embed("🎯 Correct Answer!", f"Great job {message.author.mention}! The word (`{message.content}`) is correct.\n\nMoving to the next question...\nNew letter: **{new_letter.upper()}**", config.COLORS["success"])
             await message.reply(embed=embed_res)
             return
+        else:
+            # اختيارياً: تنبيه لو كانت الإجابة خاطئة أو بحرف غير مطلوب
+            if len(content) > 1 and not content.startswith(target_letter):
+                embed_err = games.embed("❌ Incorrect!", f"Wrong letter! The word must start with **{target_letter.upper()}**.", config.COLORS.get("error", 0xFF0000))
+                await message.reply(embed=embed_err, delete_after=3)
+                return
 
     await bot.process_commands(message)
 
@@ -130,8 +137,16 @@ class RouletteLobbyView(discord.ui.View):
         game = roulette_games.get(self.cid)
         if not game or game["started"] or interaction.user.id in game["players"]:
             return await interaction.response.send_message("You cannot join.", ephemeral=True)
+        
+        # إضافة اللاعب وتحديث عدد اللاعبين فوراً في الـ Embed
         game["players"][interaction.user.id] = interaction.user
-        await interaction.response.send_message("✅ Successfully joined!", ephemeral=True)
+        count = len(game["players"])
+        
+        try:
+            await interaction.response.edit_message(embed=games.embed("🎰 Roulette Lobby", f"Host: <@{game['host']}>\nPlayers: {count}\n\nClick Join to participate (within 10 seconds)"))
+            await interaction.followup.send("✅ Successfully joined!", ephemeral=True)
+        except:
+            await interaction.response.send_message("✅ Successfully joined!", ephemeral=True)
 
     async def on_timeout(self):
         game = roulette_games.pop(self.cid, None)
@@ -296,4 +311,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-    
+                
