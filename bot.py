@@ -81,9 +81,19 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
         cid = interaction.channel_id
         if cid in roulette_games:
             return await interaction.response.send_message("تنبيه: توجد لعبة روليت تعمل بالفعل في هذه الروم.", ephemeral=True)
+        
         roulette_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
-        await interaction.response.send_message(embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط على زر الانضمام للمشاركة (خلال 10 ثانية)"))
-        asyncio.create_task(run_roulette_timer(cid, interaction.channel))
+        
+        # إرسال الرسالة مع الزر وتخزينها للتحكم بها
+        view = RouletteLobbyView(cid)
+        await interaction.response.send_message(
+            embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط على زر الانضمام للمشاركة (خلال 10 ثانية)"),
+            view=view
+        )
+        msg = await interaction.original_response()
+        
+        # تشغيل مؤقت الـ 10 ثواني وبعدها بدء الروليت تلقائياً
+        asyncio.create_task(run_roulette_timer(cid, interaction.channel, msg, view))
         return
 
     if g == "dice":
@@ -129,8 +139,10 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
         return await interaction.response.send_message(embed=games.embed("أتوبيس كومبليت", f"الحرف المطلوب: **{letter}**\n\nاكتب كلمة تبدأ بهذا الحرف في الشات بأسرع ما يمكنك!"))
 
 # ================= VIEWS & TIMERS =================
-async def run_roulette_timer(cid, channel):
+async def run_roulette_timer(cid, channel, msg, view):
     await asyncio.sleep(10)
+    view.stop() # إيقاف الأزرار
+    
     game = roulette_games.pop(cid, None)
     if not game or len(game["players"]) == 0:
         return
@@ -147,12 +159,15 @@ async def run_roulette_timer(cid, channel):
     avatar_url = winner_user.display_avatar.url
     winner_avatar = await games.download_avatar(avatar_url)
     
-    msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير لمدة 10 ثوانٍ..."))
+    try:
+        await msg.edit(embed=games.embed("عجلة الروليت", "جارٍ التدوير لمدة 10 ثوانٍ..."), view=None)
+    except:
+        pass
     
     gif = games.create_roulette_gif(players_data, winner_name, winner_avatar)
     file = discord.File(gif, filename="roulette.gif")
     
-    await msg.edit(content="", attachments=[file])
+    new_msg = await channel.send(content="", file=file)
     await asyncio.sleep(10)
     await channel.send(embed=games.embed("فائز الروليت", f"مبروك للفائز:\n# {winner_name}", config.COLORS["success"]))
 
@@ -322,3 +337,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
+    
