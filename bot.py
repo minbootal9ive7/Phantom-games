@@ -17,6 +17,7 @@ roulette_games = {}
 bus_games = {}
 
 ARABIC_LETTERS = list("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
+BUS_CATEGORIES = ["اسم", "جماد", "حيوان", "نبات", "بلاد"]
 
 @bot.event
 async def on_ready():
@@ -35,15 +36,19 @@ async def on_message(message):
     if cid in bus_games:
         game_data = bus_games[cid]
         target_letter = game_data["letter"]
+        target_cat = game_data["category"]
         content = message.content.strip()
 
-        if content.startswith(target_letter) and len(content) > 0:
+        if content.startswith(target_letter) and 3 <= len(content) <= 5:
             new_letter = random.choice(ARABIC_LETTERS)
+            new_cat = random.choice(BUS_CATEGORIES)
+            
             bus_games[cid]["letter"] = new_letter
+            bus_games[cid]["category"] = new_cat
 
             embed_res = games.embed(
                 "إجابة صحيحة", 
-                f"أحسنت {message.author.mention}! الكلمة ({message.content}) صحيحة.\n\nالحرف الجديد: {new_letter}\nاستمروا في الكتابة أو اضغطوا على زر الإيقاف أدناه.", 
+                f"أحسنت {message.author.mention}! الكلمة ({message.content}) صحيحة.\n\nالسؤال الجديد:\nالمطلوب: **{new_cat}** بحرف **{new_letter}** (من 3 إلى 5 أحرف)\n\nاستمروا في الكتابة أو اضغطوا على زر الإيقاف أدناه.", 
                 config.COLORS["success"]
             )
             
@@ -51,8 +56,8 @@ async def on_message(message):
             await message.reply(embed=embed_res, view=view)
             return
         else:
-            if len(content) > 0 and not content.startswith(target_letter):
-                embed_err = games.embed("إجابة خاطئة", f"حرف خاطئ! يجب أن تبدأ الكلمة بالحرف {target_letter}.", config.COLORS.get("error", 0xFF0000))
+            if len(content) > 0 and (not content.startswith(target_letter) or not (3 <= len(content) <= 5)):
+                embed_err = games.embed("إجابة خاطئة", f"تأكد أن تبدأ الكلمة بحرف **{target_letter}** وأن يكون طولها بين **3 و 5 أحرف** فقط.", config.COLORS.get("error", 0xFF0000))
                 await message.reply(embed=embed_err, delete_after=3)
                 return
 
@@ -142,11 +147,13 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
             return await interaction.response.send_message("تنبيه: لعبة أتوبيس كومبليت تعمل بالفعل في هذه الروم.", ephemeral=True)
             
         letter = random.choice(ARABIC_LETTERS)
-        bus_games[cid] = {"letter": letter, "host": p.id}
+        chosen_cat = random.choice(BUS_CATEGORIES)
+        
+        bus_games[cid] = {"letter": letter, "category": chosen_cat, "host": p.id}
         
         view = BusControlView(cid, p.id)
         return await interaction.response.send_message(
-            embed=games.embed("أتوبيس كومبليت", f"الحرف المطلوب: {letter}\n\nاكتب كلمة تبدأ بهذا الحرف في الشات بأسرع ما يمكنك!"),
+            embed=games.embed("أتوبيس كومبليت", f"المطلوب: **{chosen_cat}** بحرف **{letter}**\n(يجب أن تتكون الكلمة من **3 إلى 5 أحرف**)\n\nاكتب الإجابة الصحيحة في الشات بأسرع ما يمكنك!"),
             view=view
         )
 
@@ -388,4 +395,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-                                                                                                              
+        
