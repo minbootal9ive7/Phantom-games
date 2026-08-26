@@ -14,8 +14,8 @@ from games import setup_games
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("nightfall")
 
-TOKEN = os.getenv("DISCORD_TOKEN", "ضع_التوكن_هنا")
-GUILD_ID = os.getenv("GUILD_ID")  # ضع ID السيرفر عشان الأوامر تظهر فوراً بدل الانتظار ساعة
+TOKEN = os.getenv("DISCORD_TOKEN","MTU0MjIwMTAzMTYyMTA4NzI3NA.GNTc3b.xuO3RXnSyagGdBH1XO8Ydd8WLhQ_C01h28VnFg")
+GUILD_ID = os.getenv("1527415229279895744")  # ضع ID السيرفر عشان الأوامر تظهر فوراً بدل الانتظار ساعة
 
 intents = discord.Intents.default()
 intents.message_content = True
