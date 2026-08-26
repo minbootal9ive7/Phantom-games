@@ -74,7 +74,7 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
             if cid in roulette_games: return await interaction.response.send_message("توجد لعبة روليت تعمل بالفعل.", ephemeral=True)
             roulette_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
             view = RouletteLobbyView(cid)
-            await interaction.response.send_message(embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط للانضمام خلال 20 ثانية"), view=view)
+            await interaction.response.send_message(embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nيجب أن يكون هناك لاعبان على الأقل لتبدأ العجلة! اضغط للانضمام خلال 20 ثانية"), view=view)
             asyncio.create_task(run_roulette_timer(cid, interaction.channel, await interaction.original_response(), view))
             return
         if g == "dice":
@@ -104,7 +104,7 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
             if cid in bus_games: return await interaction.response.send_message("أتوبيس كومبليت يعمل بالفعل.", ephemeral=True)
             letter, cat, length = random.choice(ARABIC_LETTERS), random.choice(BUS_CATEGORIES), random.randint(3, 5)
             bus_games[cid] = {"letter": letter, "category": cat, "length": length, "host": p.id}
-            return await interaction.response.send_message(embed=games.embed("أتوبيس كومبليت", f"المطلوب: **{cat}** بحرف **{letter}** (تتكون من **{length}** أحرف)"), view=BusControlView(cid, p.id))
+            return await interaction.response.send_message(embed=games.embed("أتوبيس كومبليت", f"المطلوب للجميع: **{cat}** بحرف **{letter}** (تتكون من **{length}** أحرف)\n\nأكتب الإجابة بالروم ليجاوب أي شخص!"))
         
         await interaction.response.send_message(embed=games.embed("تنبيه", "هذه اللعبة غير متوفرة حالياً."), ephemeral=True)
     except Exception as e:
@@ -128,13 +128,22 @@ async def run_roulette_timer(cid, channel, msg, view):
     view.stop()
     game = roulette_games.pop(cid, None)
     if not game or not game["players"]: return
+    
+    players_list = list(game["players"].values())
+    if len(players_list) < 2:
+        try:
+            await msg.edit(embed=games.embed("إلغاء الروليت", "تم إلغاء اللعبة لعدم اكتمال الحد الأدنى من اللاعبين (مطلوب لاعبان على الأقل)."), view=None)
+        except:
+            pass
+        return
+
     players_data = []
-    for usr in game["players"].values():
+    for usr in players_list:
         try: img = await games.download_avatar(usr.display_avatar.url)
         except: img = None
         players_data.append({"name": usr.display_name, "user": usr, "avatar": img})
     winner_name = games.roulette_winner([p["name"] for p in players_data])
-    winner_user = next((p["user"] for p in players_data if p["name"] == winner_name), list(game["players"].values())[0])
+    winner_user = next((p["user"] for p in players_data if p["name"] == winner_name), players_list[0])
     try: await msg.delete()
     except: pass
     try:
@@ -153,7 +162,7 @@ class RouletteLobbyView(discord.ui.View):
         game = roulette_games.get(self.cid)
         if not game or game["started"] or i.user.id in game["players"]: return await i.response.send_message("لا يمكنك الانضمام.", ephemeral=True)
         game["players"][i.user.id] = i.user
-        await i.response.edit_message(embed=games.embed("لعبة الروليت", f"المنشئ: <@{game['host']}>\nاللاعبون: {len(game['players'])}"))
+        await i.response.edit_message(embed=games.embed("لعبة الروليت", f"المنشئ: <@{game['host']}>\nاللاعبون: {len(game['players'])}\n\n(مطلوب لاعبان على الأقل لبدء الدوران)"))
         await i.followup.send("تم الانضمام!", ephemeral=True)
 
 class MafiaView(discord.ui.View):
