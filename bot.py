@@ -15,6 +15,8 @@ chairs_games = {}
 roulette_games = {}
 bus_games = {}
 
+ARABIC_LETTERS = list("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
+
 @bot.event
 async def on_ready():
     try:
@@ -31,20 +33,20 @@ async def on_message(message):
     cid = message.channel.id
     if cid in bus_games:
         game_data = bus_games[cid]
-        target_letter = game_data["letter"].lower()
-        content = message.content.strip().lower()
+        target_letter = game_data["letter"]
+        content = message.content.strip()
 
-        if content.startswith(target_letter) and len(content) > 1:
+        if content.startswith(target_letter) and len(content) > 0:
             bus_games.pop(cid, None)
-            new_letter = random.choice("abcdefghijklmnopqrstuvwxyz")
+            new_letter = random.choice(ARABIC_LETTERS)
             bus_games[cid] = {"letter": new_letter}
 
-            embed_res = games.embed("إجابة صحيحة", f"أحسنت {message.author.mention}! الكلمة (`{message.content}`) صحيحة.\n\nالانتقال للسؤال التالي...\nالحرف الجديد: **{new_letter.upper()}**", config.COLORS["success"])
+            embed_res = games.embed("إجابة صحيحة", f"أحسنت {message.author.mention}! الكلمة (`{message.content}`) صحيحة.\n\nالانتقال للسؤال التالي...\nالحرف الجديد: **{new_letter}**", config.COLORS["success"])
             await message.reply(embed=embed_res)
             return
         else:
-            if len(content) > 1 and not content.startswith(target_letter):
-                embed_err = games.embed("إجابة خاطئة", f"حرف خاطئ! يجب أن تبدأ الكلمة بالحرف **{target_letter.upper()}**.", config.COLORS.get("error", 0xFF0000))
+            if len(content) > 0 and not content.startswith(target_letter):
+                embed_err = games.embed("إجابة خاطئة", f"حرف خاطئ! يجب أن تبدأ الكلمة بالحرف **{target_letter}**.", config.COLORS.get("error", 0xFF0000))
                 await message.reply(embed=embed_err, delete_after=3)
                 return
 
@@ -80,7 +82,9 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
         if cid in roulette_games:
             return await interaction.response.send_message("تنبيه: توجد لعبة روليت تعمل بالفعل في هذه الروم.", ephemeral=True)
         roulette_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
-        return await interaction.response.send_message(embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط على زر الانضمام للمشاركة (خلال 10 ثانية)"), view=RouletteLobbyView(cid))
+        await interaction.response.send_message(embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط على زر الانضمام للمشاركة (خلال 10 ثانية)"))
+        asyncio.create_task(run_roulette_timer(cid, interaction.channel))
+        return
 
     if g == "dice":
         res, wins = games.roll_dice([p.display_name, "البوت"])
@@ -120,11 +124,38 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
 
     if g == "bus":
         cid = interaction.channel_id
-        letter = random.choice("abcdefghijklmnopqrstuvwxyz")
+        letter = random.choice(ARABIC_LETTERS)
         bus_games[cid] = {"letter": letter}
-        return await interaction.response.send_message(embed=games.embed("أتوبيس كومبليت", f"الحرف المطلوب: **{letter.upper()}**\n\nاكتب كلمة تبدأ بهذا الحرف في الشات بأسرع ما يمكنك!"))
+        return await interaction.response.send_message(embed=games.embed("أتوبيس كومبليت", f"الحرف المطلوب: **{letter}**\n\nاكتب كلمة تبدأ بهذا الحرف في الشات بأسرع ما يمكنك!"))
 
-# ================= VIEWS =================
+# ================= VIEWS & TIMERS =================
+async def run_roulette_timer(cid, channel):
+    await asyncio.sleep(10)
+    game = roulette_games.pop(cid, None)
+    if not game or len(game["players"]) == 0:
+        return
+        
+    players_dict = game["players"]
+    players_list = list(players_dict.values())
+    
+    players_data = [{"name": usr.display_name, "user": usr} for usr in players_list]
+    display_names = [p["name"] for p in players_data]
+    
+    winner_name = games.roulette_winner(display_names)
+    
+    winner_user = next((p["user"] for p in players_data if p["name"] == winner_name), players_list[0])
+    avatar_url = winner_user.display_avatar.url
+    winner_avatar = await games.download_avatar(avatar_url)
+    
+    msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير لمدة 10 ثوانٍ..."))
+    
+    gif = games.create_roulette_gif(players_data, winner_name, winner_avatar)
+    file = discord.File(gif, filename="roulette.gif")
+    
+    await msg.edit(content="", attachments=[file])
+    await asyncio.sleep(10)
+    await channel.send(embed=games.embed("فائز الروليت", f"مبروك للفائز:\n# {winner_name}", config.COLORS["success"]))
+
 class RouletteLobbyView(discord.ui.View):
     def __init__(self, cid):
         super().__init__(timeout=10)
@@ -144,36 +175,6 @@ class RouletteLobbyView(discord.ui.View):
             await interaction.followup.send("تم الانضمام بنجاح!", ephemeral=True)
         except:
             await interaction.response.send_message("تم الانضمام بنجاح!", ephemeral=True)
-
-    async def on_timeout(self):
-        game = roulette_games.pop(self.cid, None)
-        if not game or len(game["players"]) == 0:
-            return
-            
-        players_dict = game["players"]
-        players_list = list(players_dict.values())
-        
-        players_data = [{"name": usr.display_name, "user": usr} for usr in players_list]
-        display_names = [p["name"] for p in players_data]
-        
-        winner_name = games.roulette_winner(display_names)
-        
-        winner_user = next((p["user"] for p in players_data if p["name"] == winner_name), players_list[0])
-        avatar_url = winner_user.display_avatar.url
-        winner_avatar = await games.download_avatar(avatar_url)
-        
-        channel = bot.get_channel(self.cid)
-        if not channel:
-            return
-
-        msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير لمدة 10 ثوانٍ..."))
-        
-        gif = games.create_roulette_gif(players_data, winner_name, winner_avatar)
-        file = discord.File(gif, filename="roulette.gif")
-        
-        await msg.edit(content="", attachments=[file])
-        await asyncio.sleep(10)
-        await channel.send(embed=games.embed("فائز الروليت", f"مبروك للفائز:\n# {winner_name}", config.COLORS["success"]))
 
 class MafiaView(discord.ui.View):
     def __init__(self, cid):
@@ -321,4 +322,3 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-                                                                         
