@@ -29,7 +29,7 @@ def embed(title, text, color=None):
     )
 
 # =========================================================
-# 🎰 ROULETTE (بنفس تصميم الصورة: لونين متناوبين + سهم جانبي + صورة الوسط)
+# 🎰 ROULETTE
 # =========================================================
 def create_roulette_gif(players, winner):
     W = H = 600
@@ -40,10 +40,7 @@ def create_roulette_gif(players, winner):
     segment = 360 / count
     winner_i = players.index(winner)
 
-    # السهم موجود على اليمين (0 درجة)، لذا نظبط الهدف ليقف عنده تماماً
     target = -(winner_i * segment + segment / 2) + 360 * 10
-    
-    # لونين متناسقين (فاتح وغامق) مثل الصورة المرفقة
     colors = [(216, 147, 201), (138, 91, 133)]
 
     try:
@@ -84,7 +81,6 @@ def create_roulette_gif(players, winner):
 
             d.text((x - tw / 2, y - th / 2), text, fill="white", font=font)
 
-        # أيقونة الوسط (png1.png) بدائرة دقيقة
         try:
             logo = Image.open("png1.png").convert("RGBA")
             logo = logo.resize((120, 120))
@@ -92,16 +88,12 @@ def create_roulette_gif(players, winner):
             draw_mask = ImageDraw.Draw(mask)
             draw_mask.ellipse((0, 0, 120, 120), fill=255)
             img.paste(logo, (C - 60, C - 60), mask)
-            
-            # إطار دائري حول الصورة
             d.ellipse((C-62, C-62, C+62, C+62), outline="white", width=3)
         except:
             d.ellipse((C-60, C-60, C+60, C+60), fill=(40, 40, 50), outline="white", width=3)
             d.text((C-35, C-10), "NIGHTFALL", fill="white", font=font)
 
-        # السهم الجانبي الأيمن يشير للعجلة
         d.polygon([(595, 300), (560, 285), (560, 315)], fill="white")
-
         frames.append(img)
 
     out = BytesIO()
