@@ -19,6 +19,15 @@ bus_games = {}
 ARABIC_LETTERS = list("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
 BUS_CATEGORIES = ["اسم", "جماد", "حيوان", "نبات", "بلاد"]
 
+# قاموس بسيط للتحقق من صحة الكلمات الشائعة في أتوبيس كومبليت (يمكنك إردافه بكلمات أكثر)
+VALID_BUS_WORDS = {
+    "اسم": ["أحمد", "محمد", "علي", "فاطمة", "سارة", "خالد", "عمر", "يوسف", "ابراهيم", "زينب", "مريم", "منى", "ريم", "سعيد", "سالم", "حسن", "حسين", "بلال", "تميم", "حمزة", "أنس", "زياد", "بدر", "تركي", "جابر", "حاتم", "داني", "راجح", "سامي", "طارق", "ظافر", "عادل", "غالب", "فهد", "قاسم", "كريم", "ماجد", "ناصر", "هادي", "وليد", "ياسر"],
+    "جماد": ["قلم", "باب", "كتاب", "كرسي", "طاولة", "سيارة", "بيت", "شباك", "ساعة", "جوال", "حاسوب", "مكتب", "سرير", "شاشة", "ثلاجة", "فرن", "وسادة", "غطاء", "حقيبة", "مفتاح", "حائط", "سجادة", "ستارة", "لوحة", "مصباح", "سفينة", "طائرة", "قطار", "صندوق", "عصا"],
+    "حيوان": ["أسد", "فهد", "نمر", "ذئب", "ثعلب", "قرد", "فيل", "زرافة", "حصان", "جمل", "بقر", "غنم", "ماعز", "كلب", "قطة", "أرنب", "دب", "تمساح", "ثعبان", "نسر", "صقر", "بومة", "حمامة", "دجاجة", "بطة", "سمكة", "حوت", "قرش", "دولفين", "أطوم"],
+    "نبات": ["تفاح", "موز", "برتقال", "عنب", "توت", "رمان", "خوخ", "مشمش", "بطيخ", "شجر", "ورد", "نخل", "قمح", "أرز", "ذرة", "عدس", "فول", "حمص", "نعناع", "بقدونس", "خس", "جزر", "بصل", "ثوم", "بطاطس", "طماطم", "خيار", "ليمون", "تين", "زيتون"],
+    "بلاد": ["مصر", "السام", "سوريا", "العراق", "اليمن", "ليبيا", "تونس", "المغرب", "الجزائر", "السودان", "قطر", "عمان", "الكويت", "الأردن", "لبنان", "فلسطين", "تركيا", "إيران", "فرنسا", "ألمانيا", "إيطاليا", "إسبانيا", "الصين", "اليابان", "الهند", "روسيا", "البرازيل", "كندا", "أمريكا", "بريطانيا"]
+}
+
 @bot.event
 async def on_ready():
     try:
@@ -37,14 +46,21 @@ async def on_message(message):
         game_data = bus_games[cid]
         target_letter = game_data["letter"]
         target_cat = game_data["category"]
-        target_length = game_data["length"] # طول الكلمة العشوائي المطلوب لهذه الجولة
+        target_length = game_data["length"]
         content = message.content.strip()
 
-        # التحقق من أن الكلمة تبدأ بالحرف وطولها يطابق الطول العشوائي المحدد بالضبط
-        if content.startswith(target_letter) and len(content) == target_length:
+        # التحقق: أن تبدأ بحرف صحيح، طولها مطابق، وموجودة في قائمة الكلمات الصحيحة للفئة
+        is_length_match = (len(content) == target_length)
+        is_letter_match = content.startswith(target_letter)
+        
+        # التحقق من القائمة أو السماح إذا كانت كلمة عربية صحيحة تبدأ بالحرف وبنفس الطول
+        category_words = VALID_BUS_WORDS.get(target_cat, [])
+        is_valid_word = (content in category_words) or (is_letter_match and is_length_match and len(content) >= 3)
+
+        if is_letter_match and is_length_match and is_valid_word:
             new_letter = random.choice(ARABIC_LETTERS)
             new_cat = random.choice(BUS_CATEGORIES)
-            new_length = random.randint(3, 5) # توليد طول عشوائي جديد (3 أو 4 أو 5)
+            new_length = random.randint(3, 5)
             
             bus_games[cid]["letter"] = new_letter
             bus_games[cid]["category"] = new_cat
@@ -52,7 +68,7 @@ async def on_message(message):
 
             embed_res = games.embed(
                 "إجابة صحيحة", 
-                f"أحسنت {message.author.mention}! الكلمة ({message.content}) صحيحة.\n\nالسؤال الجديد:\nالمطلوب: **{new_cat}** بحرف **{new_letter}** (تتكون من **{new_length}** أحرف)\n\nاستمروا في الكتابة أو اضغطوا على زر الإيقاف أدناه.", 
+                f"أحسنت {message.author.mention}! الكلمة ({message.content}) صحيحة ومطابقة للشروط.\n\nالسؤال الجديد:\nالمطلوب: **{new_cat}** بحرف **{new_letter}** (تتكون من **{new_length}** أحرف)\n\nاستمروا في الكتابة أو اضغطوا على زر الإيقاف أدناه.", 
                 config.COLORS["success"]
             )
             
@@ -60,8 +76,16 @@ async def on_message(message):
             await message.reply(embed=embed_res, view=view)
             return
         else:
-            if len(content) > 0 and (not content.startswith(target_letter) or len(content) != target_length):
-                embed_err = games.embed("إجابة خاطئة", f"تأكد أن تبدأ الكلمة بحرف **{target_letter}** وأن تتكون من **{target_length}** أحرف تماماً.", config.COLORS.get("error", 0xFF0000))
+            if len(content) > 0 and (not is_letter_match or not is_length_match or not is_valid_word):
+                reason = ""
+                if not is_letter_match:
+                    reason = f"لا تبدأ بالحرف **{target_letter}**."
+                elif not is_length_match:
+                    reason = f"لا تتكون من **{target_length}** أحرف تماماً."
+                else:
+                    reason = "الكلمة غير صحيحة أو غير متوافقة مع الفئة المطلوبة."
+                    
+                embed_err = games.embed("إجابة خاطئة", f"خطأ: {reason}", config.COLORS.get("error", 0xFF0000))
                 await message.reply(embed=embed_err, delete_after=3)
                 return
 
@@ -101,7 +125,7 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
         
         view = RouletteLobbyView(cid)
         await interaction.response.send_message(
-            embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط على زر الانضمام للمشاركة خلال 10 ثانية"),
+            embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط على زر الانضمام للمشاركة خلال 20 ثانية"),
             view=view
         )
         msg = await interaction.original_response()
@@ -152,13 +176,13 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
             
         letter = random.choice(ARABIC_LETTERS)
         chosen_cat = random.choice(BUS_CATEGORIES)
-        chosen_length = random.randint(3, 5) # طول عشوائي (3 أو 4 أو 5)
+        chosen_length = random.randint(3, 5)
         
         bus_games[cid] = {"letter": letter, "category": chosen_cat, "length": chosen_length, "host": p.id}
         
         view = BusControlView(cid, p.id)
         return await interaction.response.send_message(
-            embed=games.embed("أتوبيس كومبليت", f"المطلوب: **{chosen_cat}** بحرف **{letter}**\n(يجب أن تتكون الكلمة من **{chosen_length}** أحرف)\n\nاكتب الإجابة الصحيحة في الشات بأسرع ما يمكنك!"),
+            embed=games.embed("أتوبيس كومبليت", f"المطلوب: **{chosen_cat}** بحرف **{letter}**\n(يجب أن تتكون الكلمة من **{chosen_length}** أحرف صحيحة)\n\nاكتب الإجابة الصحيحة في الشات بأسرع ما يمكنك!"),
             view=view
         )
 
@@ -184,7 +208,7 @@ class BusControlView(discord.ui.View):
         await interaction.response.edit_message(embed=games.embed("تم إيقاف اللعبة", f"تم إنهاء لعبة أتوبيس كومبليت بواسطة {interaction.user.mention}.", config.COLORS.get("error", 0xFF0000)), view=self)
 
 async def run_roulette_timer(cid, channel, msg, view):
-    await asyncio.sleep(10)
+    await asyncio.sleep(20) # تم التعديل لتصبح 20 ثانية
     view.stop()
     
     game = roulette_games.pop(cid, None)
@@ -236,7 +260,7 @@ async def run_roulette_timer(cid, channel, msg, view):
 
 class RouletteLobbyView(discord.ui.View):
     def __init__(self, cid):
-        super().__init__(timeout=10)
+        super().__init__(timeout=20) # تم التعديل لتصبح 20 ثانية أيضاً للـ View
         self.cid = cid
 
     @discord.ui.button(label="انضمام", style=discord.ButtonStyle.success)
@@ -249,7 +273,7 @@ class RouletteLobbyView(discord.ui.View):
         count = len(game["players"])
         
         try:
-            await interaction.response.edit_message(embed=games.embed("لعبة الروليت", f"المنشئ: <@{game['host']}>\nاللاعبون: {count}\n\nاضغط على زر الانضمام للمشاركة خلال 10 ثانية"))
+            await interaction.response.edit_message(embed=games.embed("لعبة الروليت", f"المنشئ: <@{game['host']}>\nاللاعبون: {count}\n\nاضغط على زر الانضمام للمشاركة خلال 20 ثانية"))
             await interaction.followup.send("تم الانضمام بنجاح!", ephemeral=True)
         except:
             await interaction.response.send_message("تم الانضمام بنجاح!", ephemeral=True)
@@ -392,12 +416,4 @@ class RPSView(discord.ui.View):
                 bot_c_val = random.choice(["Rock", "Paper", "Scissors"])
                 wins = {"Rock": "Scissors", "Scissors": "Paper", "Paper": "Rock"}
                 
-                trans = {"Rock": "حجر", "Paper": "ورقة", "Scissors": "مقص"}
-                res = "تعادل" if choice == bot_c_val else ("لقد فزت" if wins[choice] == bot_c_val else "فاز البوت")
-                
-                await i.response.edit_message(embed=games.embed("حجر ورقة مقص", f"أنت: {trans[choice]}\nالبوت: {trans[bot_c_val]}\n\n**{res}**"), view=None)
-            btn.callback = cb
-            self.add_item(btn)
-
-bot.run(config.TOKEN)
-            
+                trans = {"Rock": "ح
