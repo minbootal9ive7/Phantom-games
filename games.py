@@ -101,25 +101,27 @@ def create_roulette_gif(players_data, winner_name):
 
             d.text((x - tw / 2, y - th / 2), text, fill="white", font=font)
 
-        # رسم السهم الصغير الثابت على الحافة اليمنى (بنفس مكان الشكل في الصورة)
-        # إحداثيات رأس السهم وجانبيه ليكون مثلثاً بارزاً للخارج من جهة اليمين عند زاوية 0 (3 إحداثيات للـ polygon)
-        arrow_tip = (C + R + 3, C)         # رأس السهم على حافة الدائرة يميناً
-        arrow_top = (C + R + 20, C - 10)   # الزاوية العلوية للخارج
-        arrow_bottom = (C + R + 20, C + 10) # الزاوية السفلية للخارج
+        # رسم السهم الصغير الثابت على الحافة اليمنى
+        arrow_tip = (C + R + 3, C)
+        arrow_top = (C + R + 20, C - 10)
+        arrow_bottom = (C + R + 20, C + 10)
         d.polygon([arrow_tip, arrow_top, arrow_bottom], fill="white")
 
-        # عرض صورة الشخص الذي تمر العجلة عليه في المنتصف لحظياً
+        # عرض صورة الشخص بحجم أصغر وأنيق في المنتصف (140x140)
+        avatar_size = 140
+        half_avatar = avatar_size // 2
+
         if active_avatar:
-            avatar = active_avatar.resize((180, 180))
-            mask = Image.new("L", (150, 150), 0)
+            avatar = active_avatar.resize((avatar_size, avatar_size))
+            mask = Image.new("L", (avatar_size, avatar_size), 0)
             draw_mask = ImageDraw.Draw(mask)
-            draw_mask.ellipse((0, 0, 150, 150), fill=255)
+            draw_mask.ellipse((0, 0, avatar_size, avatar_size), fill=255)
             
-            img.paste(avatar, (C - 90, C - 90), mask)
-            d.ellipse((C-92, C-92, C+92, C+92), outline="white", width=3)
+            img.paste(avatar, (C - half_avatar, C - half_avatar), mask)
+            d.ellipse((C - half_avatar - 2, C - half_avatar - 2, C + half_avatar + 2, C + half_avatar + 2), outline="white", width=3)
         else:
-            d.ellipse((C-90, C-90, C+90, C+90), fill=(40, 40, 50), outline="white", width=3)
-            d.text((C-45, C-10), "SPIN", fill="white", font=font)
+            d.ellipse((C - half_avatar, C - half_avatar, C + half_avatar, C + half_avatar), fill=(40, 40, 50), outline="white", width=3)
+            d.text((C - 25, C - 10), "SPIN", fill="white", font=font)
 
         frames.append(img)
 
@@ -170,4 +172,4 @@ def create_mafia_roles(player_ids):
     for uid in remaining:
         roles[uid] = "مواطن"
     return roles
-    
+            
