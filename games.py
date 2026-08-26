@@ -12,7 +12,7 @@ GAMES = {
     "mafia": "Mafia",
     "country": "Guess Country",
     "hide": "Hide and Seek",
-    "chairs": "Musical Chairs",
+    "chairs": "الكراسي",
     "dice": "Dice Roll",
     "replica": "Replica",
     "rps": "Rock Paper Scissors",
