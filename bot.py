@@ -34,7 +34,6 @@ async def on_message(message):
         target_letter = game_data["letter"].lower()
         content = message.content.strip().lower()
 
-        # التحقق الدقيق: إذا بدأت بالحرف المطلوب
         if content.startswith(target_letter) and len(content) > 1:
             bus_games.pop(cid, None)
             new_letter = random.choice("abcdefghijklmnopqrstuvwxyz")
@@ -44,7 +43,6 @@ async def on_message(message):
             await message.reply(embed=embed_res)
             return
         else:
-            # اختيارياً: تنبيه لو كانت الإجابة خاطئة أو بحرف غير مطلوب
             if len(content) > 1 and not content.startswith(target_letter):
                 embed_err = games.embed("❌ Incorrect!", f"Wrong letter! The word must start with **{target_letter.upper()}**.", config.COLORS.get("error", 0xFF0000))
                 await message.reply(embed=embed_err, delete_after=3)
@@ -138,7 +136,6 @@ class RouletteLobbyView(discord.ui.View):
         if not game or game["started"] or interaction.user.id in game["players"]:
             return await interaction.response.send_message("You cannot join.", ephemeral=True)
         
-        # إضافة اللاعب وتحديث عدد اللاعبين فوراً في الـ Embed
         game["players"][interaction.user.id] = interaction.user
         count = len(game["players"])
         
@@ -152,21 +149,31 @@ class RouletteLobbyView(discord.ui.View):
         game = roulette_games.pop(self.cid, None)
         if not game or len(game["players"]) == 0:
             return
-        players_list = list(game["players"].values())
-        display_names = [usr.display_name for usr in players_list]
-        winner = games.roulette_winner(display_names)
+            
+        players_dict = game["players"]
+        players_list = list(players_dict.values())
+        
+        players_data = [{"name": usr.display_name, "user": usr} for usr in players_list]
+        display_names = [p["name"] for p in players_data]
+        
+        winner_name = games.roulette_winner(display_names)
+        
+        winner_user = next((p["user"] for p in players_data if p["name"] == winner_name), players_list[0])
+        avatar_url = winner_user.display_avatar.url
+        winner_avatar = await games.download_avatar(avatar_url)
         
         channel = bot.get_channel(self.cid)
         if not channel:
             return
 
         msg = await channel.send(embed=games.embed("🎰 Roulette Wheel", "Spinning for 10 seconds..."))
-        gif = games.create_roulette_gif(display_names, winner)
+        
+        gif = games.create_roulette_gif(players_data, winner_name, winner_avatar)
         file = discord.File(gif, filename="roulette.gif")
         
         await msg.edit(content="", attachments=[file])
         await asyncio.sleep(10)
-        await channel.send(embed=games.embed("🎉 Roulette Winner", f"Congratulations to the winner:\n# {winner}", config.COLORS["success"]))
+        await channel.send(embed=games.embed("🎉 Roulette Winner", f"Congratulations to the winner:\n# {winner_name}", config.COLORS["success"]))
 
 class MafiaView(discord.ui.View):
     def __init__(self, cid):
@@ -311,4 +318,3 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-                
