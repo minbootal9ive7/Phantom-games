@@ -111,9 +111,9 @@ def create_roulette_gif(players_data, winner_name):
         # عرض صورة الشخص الذي تمر العجلة عليه في المنتصف لحظياً
         if active_avatar:
             avatar = active_avatar.resize((180, 180))
-            mask = Image.new("L", (180, 180), 0)
+            mask = Image.new("L", (150, 150), 0)
             draw_mask = ImageDraw.Draw(mask)
-            draw_mask.ellipse((0, 0, 180, 180), fill=255)
+            draw_mask.ellipse((0, 0, 150, 150), fill=255)
             
             img.paste(avatar, (C - 90, C - 90), mask)
             d.ellipse((C-92, C-92, C+92, C+92), outline="white", width=3)
