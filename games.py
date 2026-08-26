@@ -32,12 +32,12 @@ def embed(title, text, color=None):
 async def download_avatar(url):
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
+            async with session.get(str(url)) as resp:
                 if resp.status == 200:
                     data = await resp.read()
                     return Image.open(BytesIO(data)).convert("RGBA")
-    except:
-        pass
+    except Exception as e:
+        print(f"Avatar download error: {e}")
     return None
 
 def create_roulette_gif(players_data, winner_name):
@@ -77,7 +77,6 @@ def create_roulette_gif(players_data, winner_name):
         active_player_idx = int((current_angle // segment)) % count
         active_avatar = players_data[active_player_idx].get("avatar")
 
-        # رسم قطع العجلة والنصوص
         for i, player in enumerate(players_data):
             name = player["name"]
             start = rotation + i * segment
@@ -101,13 +100,11 @@ def create_roulette_gif(players_data, winner_name):
 
             d.text((x - tw / 2, y - th / 2), text, fill="white", font=font)
 
-        # رسم السهم الصغير الثابت على الحافة اليمنى
         arrow_tip = (C + R + 3, C)
         arrow_top = (C + R + 20, C - 10)
         arrow_bottom = (C + R + 20, C + 10)
         d.polygon([arrow_tip, arrow_top, arrow_bottom], fill="white")
 
-        # عرض صورة الشخص بحجم أصغر وأنيق في المنتصف (140x140)
         avatar_size = 140
         half_avatar = avatar_size // 2
 
@@ -126,7 +123,15 @@ def create_roulette_gif(players_data, winner_name):
         frames.append(img)
 
     out = BytesIO()
-    frames[0].save(out, "GIF", save_all=True, append_images=frames[1:], duration=140, loop=0)
+    frames[0].save(
+        out, 
+        format="GIF", 
+        save_all=True, 
+        append_images=frames[1:], 
+        duration=140, 
+        loop=0,
+        optimize=False
+    )
     out.seek(0)
     return out
 
