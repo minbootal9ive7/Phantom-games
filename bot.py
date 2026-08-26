@@ -151,26 +151,44 @@ async def run_roulette_timer(cid, channel, msg, view):
     players_data = [{"name": usr.display_name, "user": usr} for usr in players_list]
     display_names = [p["name"] for p in players_data]
     
-    # اختيار الفائز أولاً قبل عمل الـ GIF
     winner_name = games.roulette_winner(display_names)
     
     winner_user = next((p["user"] for p in players_data if p["name"] == winner_name), players_list[0])
     avatar_url = winner_user.display_avatar.url
     winner_avatar = await games.download_avatar(avatar_url)
     
-    # تحديث رسالة اللوبي لتظهر أن التدوير بدأ
+    # حذف رسالة اللوبي فوراً وإرسال العجلة وهي تلف ببطء
     try:
-        await msg.edit(embed=games.embed("عجلة الروليت", "انتهى الوقت! جارٍ تدوير العجلة..."), view=None)
+        await msg.delete()
     except:
         pass
     
-    # إنشاء وإرسال الـ GIF ومعها اسم الفائز بعد الانتهاء
-    gif = games.create_roulette_gif(players_data, winner_name, winner_avatar)
+    gif = games.create_roulette_gif(players_data, winner_name)
     file = discord.File(gif, filename="roulette.gif")
     
-    await channel.send(content="", file=file)
-    await asyncio.sleep(1)
-    await channel.send(embed=games.embed("فائز الروليت", f"مبروك للفائز:\n# {winner_name}", config.COLORS["success"]))
+    spin_msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير..."), file=file)
+    
+    # انتظار انتهاء مدة الـ GIF تقريباً (40 فريم * 0.15 ثانية = 6 ثواني تقريباً)
+    await asyncio.sleep(6)
+    
+    # بعد ما تقف العجلة تماماً، يتم حذف رسالة الـ GIF وإرسال صورة الفائز واسمه النهائي
+    try:
+        await spin_msg.delete()
+    except:
+        pass
+        
+    # إرسال رسالة إعلان الفائز مع الصورة الشخصية الحقيقية له
+    winner_embed = games.embed("فائز الروليت", f"مبروك للفائز:\n# {winner_name}", config.COLORS["success"])
+    if winner_avatar:
+        # حفظ الصورة مؤقتًا لإرسالها في الايمبد أو كملف
+        avatar_io = discord.utils.BytesIO()
+        winner_avatar.save(avatar_io, format="PNG")
+        avatar_io.seek(0)
+        file_avatar = discord.File(avatar_io, filename="winner.png")
+        winner_embed.set_thumbnail(url="attachment://winner.png")
+        await channel.send(file=file_avatar, embed=winner_embed)
+    else:
+        await channel.send(embed=winner_embed)
 
 class RouletteLobbyView(discord.ui.View):
     def __init__(self, cid):
@@ -338,4 +356,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-        
+             
