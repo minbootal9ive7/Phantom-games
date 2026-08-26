@@ -54,7 +54,6 @@ def create_roulette_gif(players_data, winner_name):
             winner_i = idx
             break
 
-    # لفات مضبوطة وسرعة أبطأ وواضحة
     target = -(winner_i * segment + segment / 2) + 360 * 4
     colors = [(216, 147, 201), (138, 91, 133)]
 
@@ -74,12 +73,11 @@ def create_roulette_gif(players_data, winner_name):
         img = Image.new("RGB", (W, H), (15, 15, 20))
         d = ImageDraw.Draw(img)
 
-        # حساب أي زاوية أو قطاع يقع في قمة العجلة (المؤشر العلوي عند زاوية 270 درجة أو 0)
-        # بما أن التدوير يبدأ من الأعلى، نحسب أي لاعب حالياً تحت المؤشر العلوي
         current_angle = (-rotation) % 360
         active_player_idx = int((current_angle // segment)) % count
         active_avatar = players_data[active_player_idx].get("avatar")
 
+        # رسم قطع العجلة والنصوص
         for i, player in enumerate(players_data):
             name = player["name"]
             start = rotation + i * segment
@@ -102,6 +100,13 @@ def create_roulette_gif(players_data, winner_name):
                 tw, th = 60, 18
 
             d.text((x - tw / 2, y - th / 2), text, fill="white", font=font)
+
+        # رسم السهم الصغير الثابت على الحافة اليمنى (بنفس مكان الشكل في الصورة)
+        # إحداثيات رأس السهم وجانبيه ليكون مثلثاً بارزاً للخارج من جهة اليمين عند زاوية 0 (3 إحداثيات للـ polygon)
+        arrow_tip = (C + R + 3, C)         # رأس السهم على حافة الدائرة يميناً
+        arrow_top = (C + R + 20, C - 10)   # الزاوية العلوية للخارج
+        arrow_bottom = (C + R + 20, C + 10) # الزاوية السفلية للخارج
+        d.polygon([arrow_tip, arrow_top, arrow_bottom], fill="white")
 
         # عرض صورة الشخص الذي تمر العجلة عليه في المنتصف لحظياً
         if active_avatar:
