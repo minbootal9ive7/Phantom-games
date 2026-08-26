@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 import config
 import games
+from io import BytesIO
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -148,7 +149,6 @@ async def run_roulette_timer(cid, channel, msg, view):
     players_dict = game["players"]
     players_list = list(players_dict.values())
     
-    # تحميل صور جميع اللاعبين المشاركين
     players_data = []
     for usr in players_list:
         avatar_img = await games.download_avatar(usr.display_avatar.url)
@@ -168,17 +168,19 @@ async def run_roulette_timer(cid, channel, msg, view):
     gif = games.create_roulette_gif(players_data, winner_name)
     file = discord.File(gif, filename="roulette.gif")
     
+    # إرسال رسالة الـ GIF وتثبيتها وعدم حذفها
     spin_msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير..."), file=file)
     
     # انتظار انتهاء مدة عرض الـ GIF بالكامل
     await asyncio.sleep(6.5)
     
+    # تحديث رسالة الـ GIF لتوضح أن الدوران انتهى (بدون حذف الـ GIF)
     try:
-        await spin_msg.delete()
+        await spin_msg.edit(embed=games.embed("عجلة الروليت", "✨ انتهت الدورة واستقررنا على الفائز!"))
     except:
         pass
         
-    # إرسال رسالة الفائز مع الصورة بوضوح
+    # إرسال رسالة الفائز المستقلة تحت الـ GIF مباشرة
     winner_embed = games.embed("🎉 فائز الروليت", f"مبروك للفائز:\n# {winner_user.mention}", config.COLORS["success"])
     
     if winner_avatar:
@@ -357,4 +359,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-            
+    
