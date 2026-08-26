@@ -96,7 +96,6 @@ def create_roulette_gif(players_data, winner_name, winner_avatar_img):
 
             d.text((x - tw / 2, y - th / 2), text, fill="white", font=font)
 
-        # وضع صورة الفائز في منتصف العجلة بشكل دائري
         if winner_avatar_img:
             avatar = winner_avatar_img.resize((120, 120))
             mask = Image.new("L", (120, 120), 0)
@@ -136,9 +135,9 @@ def roll_dice(players):
 
 def random_country():
     countries = [
-        ("🇪🇬", "Egypt", ["Egypt", "Japan", "France", "Brazil"]),
-        ("🇯🇵", "Japan", ["India", "Japan", "Canada", "Spain"]),
-        ("🇫🇷", "France", ["France", "Egypt", "Turkey", "Italy"]),
+        ("🇪🇬", "مصر", ["مصر", "اليابان", "فرنسا", "البرازيل"]),
+        ("🇯🇵", "اليابان", ["الهند", "اليابان", "كندا", "إسبانيا"]),
+        ("🇫🇷", "فرنسا", ["فرنسا", "مصر", "تركيا", "إيطاليا"]),
     ]
     f, a, c = random.choice(countries)
     return {"flag": f, "answer": a, "choices": c}
@@ -158,13 +157,13 @@ def create_mafia_roles(player_ids):
     roles = {}
     mafia_count = max(1, len(player_ids) // 4)
     for uid in player_ids[:mafia_count]:
-        roles[uid] = "Mafia"
+        roles[uid] = "مافيا"
     remaining = player_ids[mafia_count:]
     if remaining:
-        roles[remaining.pop(0)] = "Doctor"
+        roles[remaining.pop(0)] = "طبيب"
     if len(player_ids) >= 6 and remaining:
-        roles[remaining.pop(0)] = "Detective"
+        roles[remaining.pop(0)] = "محقق"
     for uid in remaining:
-        roles[uid] = "Citizen"
+        roles[uid] = "مواطن"
     return roles
-        
+            
