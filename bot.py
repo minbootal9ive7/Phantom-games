@@ -84,7 +84,6 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
         
         roulette_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
         
-        # إرسال الرسالة مع الزر وتخزينها للتحكم بها
         view = RouletteLobbyView(cid)
         await interaction.response.send_message(
             embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط على زر الانضمام للمشاركة (خلال 10 ثانية)"),
@@ -92,7 +91,6 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
         )
         msg = await interaction.original_response()
         
-        # تشغيل مؤقت الـ 10 ثواني وبعدها بدء الروليت تلقائياً
         asyncio.create_task(run_roulette_timer(cid, interaction.channel, msg, view))
         return
 
@@ -141,7 +139,7 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
 # ================= VIEWS & TIMERS =================
 async def run_roulette_timer(cid, channel, msg, view):
     await asyncio.sleep(10)
-    view.stop() # إيقاف الأزرار
+    view.stop()
     
     game = roulette_games.pop(cid, None)
     if not game or len(game["players"]) == 0:
@@ -153,22 +151,25 @@ async def run_roulette_timer(cid, channel, msg, view):
     players_data = [{"name": usr.display_name, "user": usr} for usr in players_list]
     display_names = [p["name"] for p in players_data]
     
+    # اختيار الفائز أولاً قبل عمل الـ GIF
     winner_name = games.roulette_winner(display_names)
     
     winner_user = next((p["user"] for p in players_data if p["name"] == winner_name), players_list[0])
     avatar_url = winner_user.display_avatar.url
     winner_avatar = await games.download_avatar(avatar_url)
     
+    # تحديث رسالة اللوبي لتظهر أن التدوير بدأ
     try:
-        await msg.edit(embed=games.embed("عجلة الروليت", "جارٍ التدوير لمدة 10 ثوانٍ..."), view=None)
+        await msg.edit(embed=games.embed("عجلة الروليت", "انتهى الوقت! جارٍ تدوير العجلة..."), view=None)
     except:
         pass
     
+    # إنشاء وإرسال الـ GIF ومعها اسم الفائز بعد الانتهاء
     gif = games.create_roulette_gif(players_data, winner_name, winner_avatar)
     file = discord.File(gif, filename="roulette.gif")
     
-    new_msg = await channel.send(content="", file=file)
-    await asyncio.sleep(10)
+    await channel.send(content="", file=file)
+    await asyncio.sleep(1)
     await channel.send(embed=games.embed("فائز الروليت", f"مبروك للفائز:\n# {winner_name}", config.COLORS["success"]))
 
 class RouletteLobbyView(discord.ui.View):
@@ -337,4 +338,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-    
+        
