@@ -54,7 +54,7 @@ def create_roulette_gif(players_data, winner_name):
             winner_i = idx
             break
 
-    # لفات أقل وسرعة أبطأ بوضوح
+    # لفات مضبوطة وسرعة أبطأ وواضحة
     target = -(winner_i * segment + segment / 2) + 360 * 4
     colors = [(216, 147, 201), (138, 91, 133)]
 
@@ -64,15 +64,21 @@ def create_roulette_gif(players_data, winner_name):
         font = ImageFont.load_default()
 
     frames = []
-    total_frames = 40  # عدد فريمات أقل لتكون الحركة أبطأ وأثقل
+    total_frames = 45
 
     for n in range(total_frames):
         p = n / (total_frames - 1)
-        ease = 1 - (1 - p) ** 3  # حركة تباطؤ تدريجية ناعمة
+        ease = 1 - (1 - p) ** 3
         rotation = target * ease
 
         img = Image.new("RGB", (W, H), (15, 15, 20))
         d = ImageDraw.Draw(img)
+
+        # حساب أي زاوية أو قطاع يقع في قمة العجلة (المؤشر العلوي عند زاوية 270 درجة أو 0)
+        # بما أن التدوير يبدأ من الأعلى، نحسب أي لاعب حالياً تحت المؤشر العلوي
+        current_angle = (-rotation) % 360
+        active_player_idx = int((current_angle // segment)) % count
+        active_avatar = players_data[active_player_idx].get("avatar")
 
         for i, player in enumerate(players_data):
             name = player["name"]
@@ -97,24 +103,23 @@ def create_roulette_gif(players_data, winner_name):
 
             d.text((x - tw / 2, y - th / 2), text, fill="white", font=font)
 
-        # دائرة منتصف فارغة أو شعار أثناء اللف (بدون حرق صورة الفائز)
-        try:
-            logo = Image.open("png1.png").convert("RGBA")
-            logo = logo.resize((180, 180))
+        # عرض صورة الشخص الذي تمر العجلة عليه في المنتصف لحظياً
+        if active_avatar:
+            avatar = active_avatar.resize((180, 180))
             mask = Image.new("L", (180, 180), 0)
             draw_mask = ImageDraw.Draw(mask)
             draw_mask.ellipse((0, 0, 180, 180), fill=255)
-            img.paste(logo, (C - 90, C - 90), mask)
+            
+            img.paste(avatar, (C - 90, C - 90), mask)
             d.ellipse((C-92, C-92, C+92, C+92), outline="white", width=3)
-        except:
+        else:
             d.ellipse((C-90, C-90, C+90, C+90), fill=(40, 40, 50), outline="white", width=3)
-            d.text((C-45, C-10), "NIGHTFALL", fill="white", font=font)
+            d.text((C-45, C-10), "SPIN", fill="white", font=font)
 
         frames.append(img)
 
     out = BytesIO()
-    # مدة عرض الفريم الواحد أطول (150 ملي ثانية) لضمان البطء والوضوح
-    frames[0].save(out, "GIF", save_all=True, append_images=frames[1:], duration=150, loop=0)
+    frames[0].save(out, "GIF", save_all=True, append_images=frames[1:], duration=140, loop=0)
     out.seek(0)
     return out
 
@@ -160,4 +165,4 @@ def create_mafia_roles(player_ids):
     for uid in remaining:
         roles[uid] = "مواطن"
     return roles
-            
+    
