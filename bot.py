@@ -148,16 +148,18 @@ async def run_roulette_timer(cid, channel, msg, view):
     players_dict = game["players"]
     players_list = list(players_dict.values())
     
-    players_data = [{"name": usr.display_name, "user": usr} for usr in players_list]
+    # تحميل صور جميع اللاعبين المشاركين وتمريرها مع الأسماء
+    players_data = []
+    for usr in players_list:
+        avatar_img = await games.download_avatar(usr.display_avatar.url)
+        players_data.append({"name": usr.display_name, "user": usr, "avatar": avatar_img})
+        
     display_names = [p["name"] for p in players_data]
-    
     winner_name = games.roulette_winner(display_names)
     
     winner_user = next((p["user"] for p in players_data if p["name"] == winner_name), players_list[0])
-    avatar_url = winner_user.display_avatar.url
-    winner_avatar = await games.download_avatar(avatar_url)
+    winner_avatar = next((p["avatar"] for p in players_data if p["name"] == winner_name), None)
     
-    # حذف رسالة اللوبي فوراً وإرسال العجلة وهي تلف ببطء
     try:
         await msg.delete()
     except:
@@ -168,19 +170,16 @@ async def run_roulette_timer(cid, channel, msg, view):
     
     spin_msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير..."), file=file)
     
-    # انتظار انتهاء مدة الـ GIF تقريباً (40 فريم * 0.15 ثانية = 6 ثواني تقريباً)
+    # انتظار انتهاء مدة الـ GIF
     await asyncio.sleep(6)
     
-    # بعد ما تقف العجلة تماماً، يتم حذف رسالة الـ GIF وإرسال صورة الفائز واسمه النهائي
     try:
         await spin_msg.delete()
     except:
         pass
         
-    # إرسال رسالة إعلان الفائز مع الصورة الشخصية الحقيقية له
     winner_embed = games.embed("فائز الروليت", f"مبروك للفائز:\n# {winner_name}", config.COLORS["success"])
     if winner_avatar:
-        # حفظ الصورة مؤقتًا لإرسالها في الايمبد أو كملف
         avatar_io = discord.utils.BytesIO()
         winner_avatar.save(avatar_io, format="PNG")
         avatar_io.seek(0)
@@ -356,4 +355,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-             
+        
