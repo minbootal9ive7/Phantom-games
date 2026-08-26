@@ -38,16 +38,21 @@ async def on_message(message):
         content = message.content.strip()
 
         if content.startswith(target_letter) and len(content) > 0:
-            bus_games.pop(cid, None)
             new_letter = random.choice(ARABIC_LETTERS)
-            bus_games[cid] = {"letter": new_letter}
+            bus_games[cid]["letter"] = new_letter
 
-            embed_res = games.embed("إجابة صحيحة", f"أحسنت {message.author.mention}! الكلمة (`{message.content}`) صحيحة.\n\nالانتقال للسؤال التالي...\nالحرف الجديد: **{new_letter}**", config.COLORS["success"])
-            await message.reply(embed=embed_res)
+            embed_res = games.embed(
+                "إجابة صحيحة", 
+                f"أحسنت {message.author.mention}! الكلمة ({message.content}) صحيحة.\n\nالحرف الجديد: {new_letter}\nاستمروا في الكتابة أو اضغطوا على زر الإيقاف أدناه.", 
+                config.COLORS["success"]
+            )
+            
+            view = BusControlView(cid, game_data["host"])
+            await message.reply(embed=embed_res, view=view)
             return
         else:
             if len(content) > 0 and not content.startswith(target_letter):
-                embed_err = games.embed("إجابة خاطئة", f"حرف خاطئ! يجب أن تبدأ الكلمة بالحرف **{target_letter}**.", config.COLORS.get("error", 0xFF0000))
+                embed_err = games.embed("إجابة خاطئة", f"حرف خاطئ! يجب أن تبدأ الكلمة بالحرف {target_letter}.", config.COLORS.get("error", 0xFF0000))
                 await message.reply(embed=embed_err, delete_after=3)
                 return
 
@@ -87,7 +92,7 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
         
         view = RouletteLobbyView(cid)
         await interaction.response.send_message(
-            embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط على زر الانضمام للمشاركة (خلال 10 ثانية)"),
+            embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط على زر الانضمام للمشاركة خلال 10 ثانية"),
             view=view
         )
         msg = await interaction.original_response()
@@ -109,7 +114,7 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
 
     if g == "country":
         c = games.random_country()
-        return await interaction.response.send_message(embed=games.embed("احزر الدولة", f"ما هي الدولة التي يتبعها هذا العلم؟\n\n# {c['flag']}"), view=CountryView(c))
+        return await interaction.response.send_message(embed=games.embed("احزر الدولة", f"ما هي الدولة التي يتبعها هذا العلم؟\n\n{c['flag']}"), view=CountryView(c))
 
     if g == "hide":
         seeker, hidden = games.hide_and_seek([p.display_name, "اللاعب 2", "اللاعب 3", "اللاعب 4"])
@@ -118,12 +123,12 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
     if g == "chairs":
         cid = interaction.channel_id
         if cid in chairs_games:
-            return await interaction.response.send_message("تنبيه: الكراسي الموسيقية تعمل بالفعل هنا.", ephemeral=True)
+            return await interaction.response.send_message("تنبيه: الكراسي تعمل بالفعل هنا.", ephemeral=True)
         chairs_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False, "round": 0}
-        return await interaction.response.send_message(embed=games.embed("الكراسي الموسيقية", f"المنشئ: {p.mention}\nاللاعبون: 1"), view=ChairsLobbyView(cid))
+        return await interaction.response.send_message(embed=games.embed("الكراسي", f"المنشئ: {p.mention}\nاللاعبون: 1"), view=ChairsLobbyView(cid))
 
     if g == "replica":
-        return await interaction.response.send_message(embed=games.embed("لعبة النسخة", f"الشخصية المختارة:\n# {games.replica([p.display_name, 'اللاعب 2', 'اللاعب 3'])}"))
+        return await interaction.response.send_message(embed=games.embed("لعبة النسخة", f"الشخصية المختارة:\n{games.replica([p.display_name, 'اللاعب 2', 'اللاعب 3'])}"))
 
     if g == "rps":
         return await interaction.response.send_message(embed=games.embed("حجر ورقة مقص", "اختر حركتك:"), view=RPSView())
@@ -133,11 +138,39 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
 
     if g == "bus":
         cid = interaction.channel_id
+        if cid in bus_games:
+            return await interaction.response.send_message("تنبيه: لعبة أتوبيس كومبليت تعمل بالفعل في هذه الروم.", ephemeral=True)
+            
         letter = random.choice(ARABIC_LETTERS)
-        bus_games[cid] = {"letter": letter}
-        return await interaction.response.send_message(embed=games.embed("أتوبيس كومبليت", f"الحرف المطلوب: **{letter}**\n\nاكتب كلمة تبدأ بهذا الحرف في الشات بأسرع ما يمكنك!"))
+        bus_games[cid] = {"letter": letter, "host": p.id}
+        
+        view = BusControlView(cid, p.id)
+        return await interaction.response.send_message(
+            embed=games.embed("أتوبيس كومبليت", f"الحرف المطلوب: {letter}\n\nاكتب كلمة تبدأ بهذا الحرف في الشات بأسرع ما يمكنك!"),
+            view=view
+        )
 
 # ================= VIEWS & TIMERS =================
+
+class BusControlView(discord.ui.View):
+    def __init__(self, cid, host_id):
+        super().__init__(timeout=None)
+        self.cid = cid
+        self.host_id = host_id
+
+    @discord.ui.button(label="إيقاف اللعبة", style=discord.ButtonStyle.danger)
+    async def stop_bus(self, interaction: discord.Interaction, button: discord.ui.Button):
+        game_data = bus_games.get(self.cid)
+        if not game_data:
+            return await interaction.response.send_message("اللعبة منتهية بالفعل أو غير مفعلة.", ephemeral=True)
+        
+        bus_games.pop(self.cid, None)
+        
+        for child in self.children:
+            child.disabled = True
+            
+        await interaction.response.edit_message(embed=games.embed("تم إيقاف اللعبة", f"تم إنهاء لعبة أتوبيس كومبليت بواسطة {interaction.user.mention}.", config.COLORS.get("error", 0xFF0000)), view=self)
+
 async def run_roulette_timer(cid, channel, msg, view):
     await asyncio.sleep(10)
     view.stop()
@@ -168,20 +201,16 @@ async def run_roulette_timer(cid, channel, msg, view):
     gif = games.create_roulette_gif(players_data, winner_name)
     file = discord.File(gif, filename="roulette.gif")
     
-    # إرسال رسالة الـ GIF وتثبيتها وعدم حذفها
     spin_msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير..."), file=file)
     
-    # انتظار انتهاء مدة عرض الـ GIF بالكامل
     await asyncio.sleep(6.5)
     
-    # تحديث رسالة الـ GIF لتوضح أن الدوران انتهى (بدون حذف الـ GIF)
     try:
-        await spin_msg.edit(embed=games.embed("عجلة الروليت", "✨ انتهت الدورة واستقررنا على الفائز!"))
+        await spin_msg.edit(embed=games.embed("عجلة الروليت", "انتهت الدورة واستقررنا على الفائز!"))
     except:
         pass
         
-    # إرسال رسالة الفائز المستقلة تحت الـ GIF مباشرة
-    winner_embed = games.embed("🎉 فائز الروليت", f"مبروك للفائز:\n# {winner_user.mention}", config.COLORS["success"])
+    winner_embed = games.embed("فائز الروليت", f"مبروك للفائز:\n{winner_user.mention}", config.COLORS["success"])
     
     if winner_avatar:
         avatar_io = BytesIO()
@@ -208,7 +237,7 @@ class RouletteLobbyView(discord.ui.View):
         count = len(game["players"])
         
         try:
-            await interaction.response.edit_message(embed=games.embed("لعبة الروليت", f"المنشئ: <@{game['host']}>\nاللاعبون: {count}\n\nاضغط على زر الانضمام للمشاركة (خلال 10 ثانية)"))
+            await interaction.response.edit_message(embed=games.embed("لعبة الروليت", f"المنشئ: <@{game['host']}>\nاللاعبون: {count}\n\nاضغط على زر الانضمام للمشاركة خلال 10 ثانية"))
             await interaction.followup.send("تم الانضمام بنجاح!", ephemeral=True)
         except:
             await interaction.response.send_message("تم الانضمام بنجاح!", ephemeral=True)
@@ -252,7 +281,7 @@ class ChairsLobbyView(discord.ui.View):
         if not game or i.user.id in game["players"]:
             return await i.response.send_message("خطأ", ephemeral=True)
         game["players"][i.user.id] = i.user
-        await i.response.edit_message(embed=games.embed("الكراسي الموسيقية", f"اللاعبون: {len(game['players'])}"))
+        await i.response.edit_message(embed=games.embed("الكراسي", f"اللاعبون: {len(game['players'])}"))
 
     @discord.ui.button(label="بدء", style=discord.ButtonStyle.primary)
     async def start(self, i: discord.Interaction, b: discord.ui.Button):
@@ -272,7 +301,7 @@ async def run_chairs(cid):
         chairs_games.pop(cid, None)
         ch = bot.get_channel(cid)
         if ch:
-            return await ch.send(embed=games.embed("فائز الكراسي", f"# {players[0].display_name}", config.COLORS["success"]))
+            return await ch.send(embed=games.embed("فائز الكراسي", f"{players[0].display_name}", config.COLORS["success"]))
         return
     
     game["round"] += 1
@@ -359,4 +388,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-    
+                                                                                                              
