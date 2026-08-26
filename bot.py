@@ -422,4 +422,19 @@ class CountryView(discord.ui.View):
             btn.callback = cb
             self.add_item(btn)
 
-class R
+class RPSView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=30)
+        for c in [("حجر", "Rock"), ("ورقة", "Paper"), ("مقص", "Scissors")]:
+            btn = discord.ui.Button(label=c[0], style=discord.ButtonStyle.primary)
+            async def cb(i: discord.Interaction, choice=c[1]):
+                bot_c_val = random.choice(["Rock", "Paper", "Scissors"])
+                wins = {"Rock": "Scissors", "Scissors": "Paper", "Paper": "Rock"}
+                trans = {"Rock": "حجر", "Paper": "ورقة", "Scissors": "مقص"}
+                res = "تعادل" if choice == bot_c_val else ("لقد فزت" if wins[choice] == bot_c_val else "فاز البوت")
+                await i.response.edit_message(embed=games.embed("حجر ورقة مقص", f"أنت: {trans[choice]}\nالبوت: {trans[bot_c_val]}\n\n**{res}**"), view=None)
+            btn.callback = cb
+            self.add_item(btn)
+
+bot.run(config.TOKEN)
+                
