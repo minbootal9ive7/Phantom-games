@@ -2,6 +2,7 @@ import asyncio
 import math
 import random
 from io import BytesIO
+import aiohttp
 import discord
 from PIL import Image, ImageDraw, ImageFont
 import config
@@ -28,14 +29,30 @@ def embed(title, text, color=None):
         color=color or config.COLORS["main"]
     )
 
-def create_roulette_gif(players, winner):
+async def download_avatar(url):
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.read()
+                    return Image.open(BytesIO(data)).convert("RGBA")
+    except:
+        pass
+    return None
+
+def create_roulette_gif(players_data, winner_name, winner_avatar_img):
     W = H = 600
     C = 300
     R = 235
 
-    count = len(players)
+    count = len(players_data)
     segment = 360 / count
-    winner_i = players.index(winner)
+    
+    winner_i = 0
+    for idx, p in enumerate(players_data):
+        if p["name"] == winner_name:
+            winner_i = idx
+            break
 
     target = -(winner_i * segment + segment / 2) + 360 * 10
     colors = [(216, 147, 201), (138, 91, 133)]
@@ -56,7 +73,8 @@ def create_roulette_gif(players, winner):
         img = Image.new("RGB", (W, H), (15, 15, 20))
         d = ImageDraw.Draw(img)
 
-        for i, name in enumerate(players):
+        for i, player in enumerate(players_data):
+            name = player["name"]
             start = rotation + i * segment
             end = start + segment
 
@@ -78,17 +96,27 @@ def create_roulette_gif(players, winner):
 
             d.text((x - tw / 2, y - th / 2), text, fill="white", font=font)
 
-        try:
-            logo = Image.open("png1.png").convert("RGBA")
-            logo = logo.resize((120, 120))
+        # وضع صورة الفائز في منتصف العجلة بشكل دائري
+        if winner_avatar_img:
+            avatar = winner_avatar_img.resize((120, 120))
             mask = Image.new("L", (120, 120), 0)
             draw_mask = ImageDraw.Draw(mask)
             draw_mask.ellipse((0, 0, 120, 120), fill=255)
-            img.paste(logo, (C - 60, C - 60), mask)
+            
+            img.paste(avatar, (C - 60, C - 60), mask)
             d.ellipse((C-62, C-62, C+62, C+62), outline="white", width=3)
-        except:
-            d.ellipse((C-60, C-60, C+60, C+60), fill=(40, 40, 50), outline="white", width=3)
-            d.text((C-35, C-10), "NIGHTFALL", fill="white", font=font)
+        else:
+            try:
+                logo = Image.open("png1.png").convert("RGBA")
+                logo = logo.resize((120, 120))
+                mask = Image.new("L", (120, 120), 0)
+                draw_mask = ImageDraw.Draw(mask)
+                draw_mask.ellipse((0, 0, 120, 120), fill=255)
+                img.paste(logo, (C - 60, C - 60), mask)
+                d.ellipse((C-62, C-62, C+62, C+62), outline="white", width=3)
+            except:
+                d.ellipse((C-60, C-60, C+60, C+60), fill=(40, 40, 50), outline="white", width=3)
+                d.text((C-35, C-10), "NIGHTFALL", fill="white", font=font)
 
         frames.append(img)
 
@@ -139,4 +167,4 @@ def create_mafia_roles(player_ids):
     for uid in remaining:
         roles[uid] = "Citizen"
     return roles
-    
+        
