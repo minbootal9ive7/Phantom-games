@@ -40,7 +40,7 @@ async def download_avatar(url):
         pass
     return None
 
-def create_roulette_gif(players_data, winner_name, winner_avatar_img):
+def create_roulette_gif(players_data, winner_name):
     W = H = 600
     C = 300
     R = 235
@@ -54,7 +54,8 @@ def create_roulette_gif(players_data, winner_name, winner_avatar_img):
             winner_i = idx
             break
 
-    target = -(winner_i * segment + segment / 2) + 360 * 10
+    # لفات أقل وسرعة أبطأ بوضوح
+    target = -(winner_i * segment + segment / 2) + 360 * 4
     colors = [(216, 147, 201), (138, 91, 133)]
 
     try:
@@ -63,11 +64,11 @@ def create_roulette_gif(players_data, winner_name, winner_avatar_img):
         font = ImageFont.load_default()
 
     frames = []
-    total_frames = 100
+    total_frames = 40  # عدد فريمات أقل لتكون الحركة أبطأ وأثقل
 
     for n in range(total_frames):
         p = n / (total_frames - 1)
-        ease = 1 - (1 - p) ** 4
+        ease = 1 - (1 - p) ** 3  # حركة تباطؤ تدريجية ناعمة
         rotation = target * ease
 
         img = Image.new("RGB", (W, H), (15, 15, 20))
@@ -96,32 +97,24 @@ def create_roulette_gif(players_data, winner_name, winner_avatar_img):
 
             d.text((x - tw / 2, y - th / 2), text, fill="white", font=font)
 
-        # تم تكبير حجم الصورة في المنتصف إلى 180 بدلاً من 120
-        if winner_avatar_img:
-            avatar = winner_avatar_img.resize((180, 180))
+        # دائرة منتصف فارغة أو شعار أثناء اللف (بدون حرق صورة الفائز)
+        try:
+            logo = Image.open("png1.png").convert("RGBA")
+            logo = logo.resize((180, 180))
             mask = Image.new("L", (180, 180), 0)
             draw_mask = ImageDraw.Draw(mask)
             draw_mask.ellipse((0, 0, 180, 180), fill=255)
-            
-            img.paste(avatar, (C - 90, C - 90), mask)
+            img.paste(logo, (C - 90, C - 90), mask)
             d.ellipse((C-92, C-92, C+92, C+92), outline="white", width=3)
-        else:
-            try:
-                logo = Image.open("png1.png").convert("RGBA")
-                logo = logo.resize((180, 180))
-                mask = Image.new("L", (180, 180), 0)
-                draw_mask = ImageDraw.Draw(mask)
-                draw_mask.ellipse((0, 0, 180, 180), fill=255)
-                img.paste(logo, (C - 90, C - 90), mask)
-                d.ellipse((C-92, C-92, C+92, C+92), outline="white", width=3)
-            except:
-                d.ellipse((C-90, C-90, C+90, C+90), fill=(40, 40, 50), outline="white", width=3)
-                d.text((C-45, C-10), "NIGHTFALL", fill="white", font=font)
+        except:
+            d.ellipse((C-90, C-90, C+90, C+90), fill=(40, 40, 50), outline="white", width=3)
+            d.text((C-45, C-10), "NIGHTFALL", fill="white", font=font)
 
         frames.append(img)
 
     out = BytesIO()
-    frames[0].save(out, "GIF", save_all=True, append_images=frames[1:], duration=100, loop=0)
+    # مدة عرض الفريم الواحد أطول (150 ملي ثانية) لضمان البطء والوضوح
+    frames[0].save(out, "GIF", save_all=True, append_images=frames[1:], duration=150, loop=0)
     out.seek(0)
     return out
 
