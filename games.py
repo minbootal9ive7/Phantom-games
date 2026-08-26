@@ -100,7 +100,7 @@ def create_roulette_gif(players_data, winner_name, winner_avatar_img):
             avatar = winner_avatar_img.resize((120, 120))
             mask = Image.new("L", (120, 120), 0)
             draw_mask = ImageDraw.Draw(mask)
-            draw_mask.ellipse((0, 0, 120, 120), fill=255)
+            draw_mask.ellipse((0, 0, 180, 180), fill=255)
             
             img.paste(avatar, (C - 60, C - 60), mask)
             d.ellipse((C-62, C-62, C+62, C+62), outline="white", width=3)
