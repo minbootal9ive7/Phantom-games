@@ -144,14 +144,80 @@ async def run_roulette_timer(cid, channel, msg, view):
         players_data.append({"name": usr.display_name, "user": usr, "avatar": img})
     winner_name = games.roulette_winner([p["name"] for p in players_data])
     winner_user = next((p["user"] for p in players_data if p["name"] == winner_name), players_list[0])
+    
+    # مسح رسالة اللوبي القديمة
     try: await msg.delete()
     except: pass
+
     try:
         spin_msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير..."), file=discord.File(games.create_roulette_gif(players_data, winner_name), filename="roulette.gif"))
     except:
         spin_msg = await channel.send(embed=games.embed("عجلة الروليت", f"الفائز: **{winner_name}**"))
+    
     await asyncio.sleep(6.5)
-    await channel.send(embed=games.embed("فائز الروليت", f"مبروك للفائز:\n{winner_user.mention}", config.COLORS["success"]))
+    
+    # مسح رسالة الدوران (الجيف) وإرسال النتيجة مع زر الإعادة
+    try: await spin_msg.delete()
+    except: pass
+
+    await channel.send(
+        embed=games.embed("فائز الروليت", f"مبروك للفائز:\n{winner_user.mention}\n\nهل تريدون إعادة اللعبة؟", config.COLORS["success"]),
+        view=RouletteRestartView(players_list)
+    )
+
+class RouletteRestartView(discord.ui.View):
+    def __init__(self, previous_players):
+        super().__init__(timeout=30)
+        self.previous_players = previous_players
+
+    @discord.ui.button(label="إعادة اللعبة 🔄", style=discord.ButtonStyle.success)
+    async def restart(self, i: discord.Interaction, b: discord.ui.Button):
+        cid = i.channel_id
+        if cid in roulette_games:
+            return await i.response.send_message("توجد لعبة روليت تعمل بالفعل.", ephemeral=True)
+        
+        # إعادة إنشاء الروليت بنفس اللاعبين القدامى تلقائياً أو فتح لوبي جديد
+        players_dict = {p.id: p for p in self.previous_players}
+        roulette_games[cid] = {"host": i.user.id, "players": players_dict, "started": False}
+        
+        await i.response.edit_message(embed=games.embed("إعادة الروليت", f"تم إعادة فتح اللعبة بواسطة {i.user.mention}\nاللاعبون المنضمون: {len(players_dict)}\n\nجارٍ تدوير العجلة فوراً..."), view=None)
+        asyncio.create_task(run_restarted_roulette(cid, i.channel, await i.original_response()))
+
+    @discord.ui.button(label="إنهاء ❌", style=discord.ButtonStyle.danger)
+    async def stop_game(self, i: discord.Interaction, b: discord.ui.Button):
+        await i.response.edit_message(embed=games.embed("انتهت اللعبة", "شكراً لكم على اللعب!"), view=None)
+
+async def run_restarted_roulette(cid, channel, msg):
+    await asyncio.sleep(3)
+    game = roulette_games.pop(cid, None)
+    if not game or not game["players"]: return
+    
+    players_list = list(game["players"].values())
+    players_data = []
+    for usr in players_list:
+        try: img = await games.download_avatar(usr.display_avatar.url)
+        except: img = None
+        players_data.append({"name": usr.display_name, "user": usr, "avatar": img})
+    
+    winner_name = games.roulette_winner([p["name"] for p in players_data])
+    winner_user = next((p["user"] for p in players_data if p["name"] == winner_name), players_list[0])
+    
+    try: await msg.delete()
+    except: pass
+
+    try:
+        spin_msg = await channel.send(embed=games.embed("عجلة الروليت", "جارٍ التدوير..."), file=discord.File(games.create_roulette_gif(players_data, winner_name), filename="roulette.gif"))
+    except:
+        spin_msg = await channel.send(embed=games.embed("عجلة الروليت", f"الفائز: **{winner_name}**"))
+    
+    await asyncio.sleep(6.5)
+    try: await spin_msg.delete()
+    except: pass
+
+    await channel.send(
+        embed=games.embed("فائز الروليت", f"مبروك للفائز:\n{winner_user.mention}\n\nهل تريدون إعادة اللعبة؟", config.COLORS["success"]),
+        view=RouletteRestartView(players_list)
+    )
 
 class RouletteLobbyView(discord.ui.View):
     def __init__(self, cid):
@@ -284,3 +350,4 @@ class RPSView(discord.ui.View):
             self.add_item(btn)
 
 bot.run(config.TOKEN)
+            
