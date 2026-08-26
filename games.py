@@ -96,26 +96,27 @@ def create_roulette_gif(players_data, winner_name, winner_avatar_img):
 
             d.text((x - tw / 2, y - th / 2), text, fill="white", font=font)
 
+        # تم تكبير حجم الصورة في المنتصف إلى 180 بدلاً من 120
         if winner_avatar_img:
-            avatar = winner_avatar_img.resize((120, 120))
+            avatar = winner_avatar_img.resize((180, 180))
             mask = Image.new("L", (180, 180), 0)
             draw_mask = ImageDraw.Draw(mask)
             draw_mask.ellipse((0, 0, 180, 180), fill=255)
             
-            img.paste(avatar, (C - 60, C - 60), mask)
-            d.ellipse((C-62, C-62, C+62, C+62), outline="white", width=3)
+            img.paste(avatar, (C - 90, C - 90), mask)
+            d.ellipse((C-92, C-92, C+92, C+92), outline="white", width=3)
         else:
             try:
                 logo = Image.open("png1.png").convert("RGBA")
-                logo = logo.resize((120, 120))
-                mask = Image.new("L", (120, 120), 0)
+                logo = logo.resize((180, 180))
+                mask = Image.new("L", (180, 180), 0)
                 draw_mask = ImageDraw.Draw(mask)
-                draw_mask.ellipse((0, 0, 120, 120), fill=255)
-                img.paste(logo, (C - 60, C - 60), mask)
-                d.ellipse((C-62, C-62, C+62, C+62), outline="white", width=3)
+                draw_mask.ellipse((0, 0, 180, 180), fill=255)
+                img.paste(logo, (C - 90, C - 90), mask)
+                d.ellipse((C-92, C-92, C+92, C+92), outline="white", width=3)
             except:
-                d.ellipse((C-60, C-60, C+60, C+60), fill=(40, 40, 50), outline="white", width=3)
-                d.text((C-35, C-10), "NIGHTFALL", fill="white", font=font)
+                d.ellipse((C-90, C-90, C+90, C+90), fill=(40, 40, 50), outline="white", width=3)
+                d.text((C-45, C-10), "NIGHTFALL", fill="white", font=font)
 
         frames.append(img)
 
@@ -135,9 +136,9 @@ def roll_dice(players):
 
 def random_country():
     countries = [
-        ("🇪🇬", "مصر", ["مصر", "اليابان", "فرنسا", "البرازيل"]),
-        ("🇯🇵", "اليابان", ["الهند", "اليابان", "كندا", "إسبانيا"]),
-        ("🇫🇷", "فرنسا", ["فرنسا", "مصر", "تركيا", "إيطاليا"]),
+        ("علم مصر", "مصر", ["مصر", "اليابان", "فرنسا", "البرازيل"]),
+        ("علم اليابان", "اليابان", ["الهند", "اليابان", "كندا", "إسبانيا"]),
+        ("علم فرنسا", "فرنسا", ["فرنسا", "مصر", "تركيا", "إيطاليا"]),
     ]
     f, a, c = random.choice(countries)
     return {"flag": f, "answer": a, "choices": c}
