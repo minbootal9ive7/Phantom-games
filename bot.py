@@ -36,19 +36,19 @@ async def on_message(message):
 
         if content.startswith(target_letter) and len(content) > 1:
             bus_games.pop(cid, None)
-            new_letter = random.choice("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
+            new_letter = random.choice("abcdefghijklmnopqrstuvwxyz")
             bus_games[cid] = {"letter": new_letter}
 
-            embed_res = games.embed("🎯 إجابة صحيحة!", f"كفو يا {message.author.mention}! الكلمة (`{message.content}`) صحيحة.\n\nالانتقال للسؤال التالي...\nالحرف الجديد: **{new_letter}**", config.COLORS["success"])
+            embed_res = games.embed("🎯 Correct Answer!", f"Great job {message.author.mention}! The word (`{message.content}`) is correct.\n\nMoving to the next question...\nNew letter: **{new_letter.upper()}**", config.COLORS["success"])
             await message.reply(embed=embed_res)
             return
 
     await bot.process_commands(message)
 
-@bot.tree.command(name="games", description="عرض جميع الألعاب المتاحة")
+@bot.tree.command(name="games", description="Show all available games")
 async def games_cmd(interaction: discord.Interaction):
     text = "\n".join(f"🔹 **{name}**" for name in games.GAMES.values())
-    await interaction.response.send_message(embed=games.embed("🎮 ألعاب نايت فول", f"قائمة الألعاب المتاحة:\n\n{text}\n\nاستخدم `/game` لبدء أي لعبة!"))
+    await interaction.response.send_message(embed=games.embed("🎮 Nightfall Games", f"Available games list:\n\n{text}\n\nUse `/game` to start any game!"))
 
 GAME_CHOICES = [
     discord.app_commands.Choice(name="Roulette", value="roulette"),
@@ -65,7 +65,7 @@ GAME_CHOICES = [
     discord.app_commands.Choice(name="Bank Game", value="bank")
 ]
 
-@bot.tree.command(name="game", description="بدء لعبة جديدة")
+@bot.tree.command(name="game", description="Start a new game")
 @discord.app_commands.choices(choice=GAME_CHOICES)
 async def game_cmd(interaction: discord.Interaction, choice: discord.app_commands.Choice[str]):
     g, p = choice.value, interaction.user
@@ -73,51 +73,51 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
     if g == "roulette":
         cid = interaction.channel_id
         if cid in roulette_games:
-            return await interaction.response.send_message("⚠️ هناك لعبة روليت تعمل بالفعل في هذه القناة.", ephemeral=True)
+            return await interaction.response.send_message("⚠️ A roulette game is already running in this channel.", ephemeral=True)
         roulette_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
-        return await interaction.response.send_message(embed=games.embed("🎰 لوبي الروليت", f"المنشئ: {p.mention}\nالمشتركين: 1\n\nاضغط Join للانضمام (خلال 10 ثوانٍ)"), view=RouletteLobbyView(cid))
+        return await interaction.response.send_message(embed=games.embed("🎰 Roulette Lobby", f"Host: {p.mention}\nPlayers: 1\n\nClick Join to participate (within 10 seconds)"), view=RouletteLobbyView(cid))
 
     if g == "dice":
         res, wins = games.roll_dice([p.display_name, "Bot"])
         txt = "\n".join(f"🔸 **{k}**: `{v}`" for k, v in res.items())
-        return await interaction.response.send_message(embed=games.embed("🎲 رمي النرد", f"{txt}\n\n🏆 **الفائز:** {', '.join(wins)}", config.COLORS["success"]))
+        return await interaction.response.send_message(embed=games.embed("🎲 Dice Roll", f"{txt}\n\n🏆 **Winner:** {', '.join(wins)}", config.COLORS["success"]))
 
     if g == "mafia":
         cid = interaction.channel_id
         if cid in mafia_games:
-            return await interaction.response.send_message("⚠️ لعبة مافيا جارية بالفعل هنا.", ephemeral=True)
+            return await interaction.response.send_message("⚠️ A mafia game is already running here.", ephemeral=True)
         mafia_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
-        return await interaction.response.send_message(embed=games.embed("🕵️ لوبي المافيا", f"المنشئ: {p.mention}\nاللاعبين: 1\n\nالحد الأدنى: 4 لاعبين"), view=MafiaView(cid))
+        return await interaction.response.send_message(embed=games.embed("🕵️ Mafia Lobby", f"Host: {p.mention}\nPlayers: 1\n\nMinimum required: 4 players"), view=MafiaView(cid))
 
     if g == "country":
         c = games.random_country()
-        return await interaction.response.send_message(embed=games.embed("🌍 تخمين الدولة", f"ما هي هذه الدولة من خلال العلم؟\n\n# {c['flag']}"), view=CountryView(c))
+        return await interaction.response.send_message(embed=games.embed("🌍 Guess Country", f"What country is this flag from?\n\n# {c['flag']}"), view=CountryView(c))
 
     if g == "hide":
-        seeker, hidden = games.hide_and_seek([p.display_name, "لاعب 2", "لاعب 3", "لاعب 4"])
-        return await interaction.response.send_message(embed=games.embed("🙈 الغميضة", f"👁️ **الباحث:** {seeker}\n👥 **المختبئون:**\n" + "".join(f"- {x}\n" for x in hidden)))
+        seeker, hidden = games.hide_and_seek([p.display_name, "Player 2", "Player 3", "Player 4"])
+        return await interaction.response.send_message(embed=games.embed("🙈 Hide and Seek", f"👁️ **Seeker:** {seeker}\n👥 **Hidden:**\n" + "".join(f"- {x}\n" for x in hidden)))
 
     if g == "chairs":
         cid = interaction.channel_id
         if cid in chairs_games:
-            return await interaction.response.send_message("⚠️ الكراسي الموسيقية تعمل بالفعل هنا.", ephemeral=True)
+            return await interaction.response.send_message("⚠️ Musical Chairs is already running here.", ephemeral=True)
         chairs_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False, "round": 0}
-        return await interaction.response.send_message(embed=games.embed("🪑 الكراسي الموسيقية", f"المنشئ: {p.mention}\nاللاعبين: 1"), view=ChairsLobbyView(cid))
+        return await interaction.response.send_message(embed=games.embed("🪑 Musical Chairs", f"Host: {p.mention}\nPlayers: 1"), view=ChairsLobbyView(cid))
 
     if g == "replica":
-        return await interaction.response.send_message(embed=games.embed("🎭 ريبليكا", f"الشخصية المختارة:\n# {games.replica([p.display_name, 'لاعب 2', 'لاعب 3'])}"))
+        return await interaction.response.send_message(embed=games.embed("🎭 Replica", f"Selected character:\n# {games.replica([p.display_name, 'Player 2', 'Player 3'])}"))
 
     if g == "rps":
-        return await interaction.response.send_message(embed=games.embed("✂️ حجر ورقة مقص", "اختر ضربتك:"), view=RPSView())
+        return await interaction.response.send_message(embed=games.embed("✂️ Rock Paper Scissors", "Choose your move:"), view=RPSView())
 
     if g in ("xo", "hotxo"):
-        return await interaction.response.send_message(embed=games.embed("❌ إكس أو", "الدور لـ: X"), view=XoView())
+        return await interaction.response.send_message(embed=games.embed("❌ Tic Tac Toe", "Turn: X"), view=XoView())
 
     if g == "bus":
         cid = interaction.channel_id
-        letter = random.choice("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
+        letter = random.choice("abcdefghijklmnopqrstuvwxyz")
         bus_games[cid] = {"letter": letter}
-        return await interaction.response.send_message(embed=games.embed("🚌 أتوبيس كومبليت", f"الحرف المطلـوب: **{letter}**\n\nاكتب كلمة تبدأ بهذا الحرف في الشات بأسرع ما يمكن!"))
+        return await interaction.response.send_message(embed=games.embed("🚌 Bus Complete", f"Required Letter: **{letter.upper()}**\n\nType a word starting with this letter in chat as fast as you can!"))
 
 # ================= VIEWS =================
 class RouletteLobbyView(discord.ui.View):
@@ -129,9 +129,9 @@ class RouletteLobbyView(discord.ui.View):
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         game = roulette_games.get(self.cid)
         if not game or game["started"] or interaction.user.id in game["players"]:
-            return await interaction.response.send_message("لا يمكنك الانضمام.", ephemeral=True)
+            return await interaction.response.send_message("You cannot join.", ephemeral=True)
         game["players"][interaction.user.id] = interaction.user
-        await interaction.response.send_message("✅ تم انضمامك بنجاح!", ephemeral=True)
+        await interaction.response.send_message("✅ Successfully joined!", ephemeral=True)
 
     async def on_timeout(self):
         game = roulette_games.pop(self.cid, None)
@@ -145,16 +145,16 @@ class RouletteLobbyView(discord.ui.View):
         if not channel:
             return
 
-        msg = await channel.send(embed=games.embed("🎰 عجلة الحظ", "جاري التدوير لمدة 10 ثوانٍ..."))
+        msg = await channel.send(embed=games.embed("🎰 Roulette Wheel", "Spinning for 10 seconds..."))
         gif = games.create_roulette_gif(display_names, winner)
         file = discord.File(gif, filename="roulette.gif")
         
         await msg.edit(content="", attachments=[file])
         await asyncio.sleep(10)
-        await channel.send(embed=games.embed("🎉 الفائز في الروليت", f"مبروك الفائز:\n# {winner}", config.COLORS["success"]))
+        await channel.send(embed=games.embed("🎉 Roulette Winner", f"Congratulations to the winner:\n# {winner}", config.COLORS["success"]))
 
 class MafiaView(discord.ui.View):
-    def __init__(self, cid):  # تم تصحيح الخطأ هنا بإضافة self
+    def __init__(self, cid):
         super().__init__(timeout=300)
         self.cid = cid
 
@@ -162,24 +162,24 @@ class MafiaView(discord.ui.View):
     async def join(self, i: discord.Interaction, b: discord.ui.Button):
         game = mafia_games.get(self.cid)
         if not game or game["started"] or i.user.id in game["players"]:
-            return await i.response.send_message("خطأ في الانضمام.", ephemeral=True)
+            return await i.response.send_message("Error joining.", ephemeral=True)
         game["players"][i.user.id] = i.user
-        await i.response.edit_message(embed=games.embed("🕵️ لوبي المافيا", f"اللاعبين: {len(game['players'])}"))
+        await i.response.edit_message(embed=games.embed("🕵️ Mafia Lobby", f"Players: {len(game['players'])}"))
 
     @discord.ui.button(label="Start 🚀", style=discord.ButtonStyle.primary)
     async def start(self, i: discord.Interaction, b: discord.ui.Button):
         game = mafia_games.get(self.cid)
         if not game or i.user.id != game["host"] or len(game["players"]) < 4:
-            return await i.response.send_message("تحتاج إلى 4 لاعبين كحد أدنى.", ephemeral=True)
+            return await i.response.send_message("Minimum 4 players required.", ephemeral=True)
         game["started"] = True
         roles = games.create_mafia_roles(list(game["players"].keys()))
         for uid, usr in game["players"].items():
             try:
-                await usr.send(embed=games.embed("🕵️ دورك في المافيا", f"دورك هو: **{roles.get(uid, 'Citizen')}**"))
+                await usr.send(embed=games.embed("🕵️ Your Mafia Role", f"Your role is: **{roles.get(uid, 'Citizen')}**"))
             except:
                 pass
         mafia_games.pop(self.cid, None)
-        await i.response.edit_message(embed=games.embed("🕵️ بدأت المافيا", "تم إرسال الأدوار بالخاص."), view=None)
+        await i.response.edit_message(embed=games.embed("🕵️ Mafia Started", "Roles have been sent via DM."), view=None)
 
 class ChairsLobbyView(discord.ui.View):
     def __init__(self, cid):
@@ -190,17 +190,17 @@ class ChairsLobbyView(discord.ui.View):
     async def join(self, i: discord.Interaction, b: discord.ui.Button):
         game = chairs_games.get(self.cid)
         if not game or i.user.id in game["players"]:
-            return await i.response.send_message("خطأ", ephemeral=True)
+            return await i.response.send_message("Error", ephemeral=True)
         game["players"][i.user.id] = i.user
-        await i.response.edit_message(embed=games.embed("🪑 الكراسي الموسيقية", f"اللاعبين: {len(game['players'])}"))
+        await i.response.edit_message(embed=games.embed("🪑 Musical Chairs", f"Players: {len(game['players'])}"))
 
     @discord.ui.button(label="Start 🎶", style=discord.ButtonStyle.primary)
     async def start(self, i: discord.Interaction, b: discord.ui.Button):
         game = chairs_games.get(self.cid)
         if not game or i.user.id != game["host"] or len(game["players"]) < 2:
-            return await i.response.send_message("تحتاج لاعبين اثنين على الأقل.", ephemeral=True)
+            return await i.response.send_message("At least 2 players required.", ephemeral=True)
         game["started"] = True
-        await i.response.edit_message(embed=games.embed("🪑 الكراسي", "بدأت الموسيقى!"), view=None)
+        await i.response.edit_message(embed=games.embed("🪑 Chairs", "Music started!"), view=None)
         asyncio.create_task(run_chairs(self.cid))
 
 async def run_chairs(cid):
@@ -212,14 +212,14 @@ async def run_chairs(cid):
         chairs_games.pop(cid, None)
         ch = bot.get_channel(cid)
         if ch:
-            return await ch.send(embed=games.embed("🏆 الفائز بالكراسي", f"# {players[0].display_name}", config.COLORS["success"]))
+            return await ch.send(embed=games.embed("🏆 Chairs Winner", f"# {players[0].display_name}", config.COLORS["success"]))
         return
     
     game["round"] += 1
     view = ChairView(cid, len(players) - 1)
     ch = bot.get_channel(cid)
     if ch:
-        await ch.send(embed=games.embed(f"الجولة {game['round']}", "الكراسي أقل من اللاعبين - اضغط بسرعة!"), view=view)
+        await ch.send(embed=games.embed(f"Round {game['round']}", "Chairs are fewer than players - click quickly!"), view=view)
     await asyncio.sleep(4)
     view.stop()
     
@@ -227,7 +227,7 @@ async def run_chairs(cid):
     if loser and loser.id in game["players"]:
         del game["players"][loser.id]
         if ch:
-            await ch.send(embed=games.embed("❌ خروج", f"خرج اللاعب: {loser.display_name}"))
+            await ch.send(embed=games.embed("❌ Eliminated", f"Player eliminated: {loser.display_name}"))
     await asyncio.sleep(2)
     asyncio.create_task(run_chairs(cid))
 
@@ -236,14 +236,14 @@ class ChairView(discord.ui.View):
         super().__init__(timeout=4)
         self.taken = set()
         for i in range(count):
-            btn = discord.ui.Button(label=f"كرسي {i+1}", style=discord.ButtonStyle.primary)
+            btn = discord.ui.Button(label=f"Chair {i+1}", style=discord.ButtonStyle.primary)
             async def cb(interaction: discord.Interaction, b=btn):
                 game = chairs_games.get(cid)
                 if not game or interaction.user.id not in game["players"] or interaction.user.id in self.taken:
-                    return await interaction.response.send_message("ممنوع", ephemeral=True)
+                    return await interaction.response.send_message("Not allowed", ephemeral=True)
                 self.taken.add(interaction.user.id)
                 b.disabled = True
-                await interaction.response.send_message("🪑 جلست!", ephemeral=True)
+                await interaction.response.send_message("🪑 Sat down!", ephemeral=True)
                 try:
                     await interaction.message.edit(view=self)
                 except:
@@ -259,7 +259,7 @@ class XoButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         if self.label != "-":
-            return await interaction.response.send_message("مأخوذ!", ephemeral=True)
+            return await interaction.response.send_message("Taken!", ephemeral=True)
         self.label = "X"
         self.style = discord.ButtonStyle.danger
         await interaction.response.edit_message(view=self.view)
@@ -277,23 +277,23 @@ class CountryView(discord.ui.View):
         for choice in data["choices"]:
             btn = discord.ui.Button(label=choice, style=discord.ButtonStyle.secondary)
             async def cb(i: discord.Interaction, ch=choice):
-                res = "✅ إجابة صحيحة!" if ch == data["answer"] else "❌ إجابة خاطئة!"
-                await i.response.edit_message(embed=games.embed(res, f"الإجابة هي: {data['answer']}"), view=None)
+                res = "✅ Correct Answer!" if ch == data["answer"] else "❌ Wrong Answer!"
+                await i.response.edit_message(embed=games.embed(res, f"The correct answer is: {data['answer']}"), view=None)
             btn.callback = cb
             self.add_item(btn)
 
 class RPSView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=30)
-        for c in ["حجر", "ورقة", "مقص"]:
+        for c in ["Rock", "Paper", "Scissors"]:
             btn = discord.ui.Button(label=c, style=discord.ButtonStyle.primary)
             async def cb(i: discord.Interaction, choice=c):
-                bot_c = random.choice(["حجر", "ورقة", "مقص"])
-                wins = {"حجر": "مقص", "مقص": "ورقة", "ورقة": "حجر"}
-                res = "تعادل 🤝" if choice == bot_c else ("فزت 🎉" if wins[choice] == bot_c else "فاز البوت 🤖")
-                await i.response.edit_message(embed=games.embed("✂️ حجر ورقة مقص", f"أنت: {choice}\nالبوت: {bot_c}\n\n**{res}**"), view=None)
+                bot_c = random.choice(["Rock", "Paper", "Scissors"])
+                wins = {"Rock": "Scissors", "Scissors": "Paper", "Paper": "Rock"}
+                res = "Tie 🤝" if choice == bot_c else ("You Won 🎉" if wins[choice] == bot_c else "Bot Won 🤖")
+                await i.response.edit_message(embed=games.embed("✂️ Rock Paper Scissors", f"You: {choice}\nBot: {bot_c}\n\n**{res}**"), view=None)
             btn.callback = cb
             self.add_item(btn)
 
 bot.run(config.TOKEN)
-        
+    
