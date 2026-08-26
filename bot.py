@@ -19,13 +19,12 @@ bus_games = {}
 ARABIC_LETTERS = list("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
 BUS_CATEGORIES = ["اسم", "جماد", "حيوان", "نبات", "بلاد"]
 
-# قاموس بسيط للتحقق من صحة الكلمات الشائعة في أتوبيس كومبليت (يمكنك إردافه بكلمات أكثر)
 VALID_BUS_WORDS = {
     "اسم": ["أحمد", "محمد", "علي", "فاطمة", "سارة", "خالد", "عمر", "يوسف", "ابراهيم", "زينب", "مريم", "منى", "ريم", "سعيد", "سالم", "حسن", "حسين", "بلال", "تميم", "حمزة", "أنس", "زياد", "بدر", "تركي", "جابر", "حاتم", "داني", "راجح", "سامي", "طارق", "ظافر", "عادل", "غالب", "فهد", "قاسم", "كريم", "ماجد", "ناصر", "هادي", "وليد", "ياسر"],
     "جماد": ["قلم", "باب", "كتاب", "كرسي", "طاولة", "سيارة", "بيت", "شباك", "ساعة", "جوال", "حاسوب", "مكتب", "سرير", "شاشة", "ثلاجة", "فرن", "وسادة", "غطاء", "حقيبة", "مفتاح", "حائط", "سجادة", "ستارة", "لوحة", "مصباح", "سفينة", "طائرة", "قطار", "صندوق", "عصا"],
     "حيوان": ["أسد", "فهد", "نمر", "ذئب", "ثعلب", "قرد", "فيل", "زرافة", "حصان", "جمل", "بقر", "غنم", "ماعز", "كلب", "قطة", "أرنب", "دب", "تمساح", "ثعبان", "نسر", "صقر", "بومة", "حمامة", "دجاجة", "بطة", "سمكة", "حوت", "قرش", "دولفين", "أطوم"],
     "نبات": ["تفاح", "موز", "برتقال", "عنب", "توت", "رمان", "خوخ", "مشمش", "بطيخ", "شجر", "ورد", "نخل", "قمح", "أرز", "ذرة", "عدس", "فول", "حمص", "نعناع", "بقدونس", "خس", "جزر", "بصل", "ثوم", "بطاطس", "طماطم", "خيار", "ليمون", "تين", "زيتون"],
-    "بلاد": ["مصر", "السام", "سوريا", "العراق", "اليمن", "ليبيا", "تونس", "المغرب", "الجزائر", "السودان", "قطر", "عمان", "الكويت", "الأردن", "لبنان", "فلسطين", "تركيا", "إيران", "فرنسا", "ألمانيا", "إيطاليا", "إسبانيا", "الصين", "اليابان", "الهند", "روسيا", "البرازيل", "كندا", "أمريكا", "بريطانيا"]
+    "بلاد": ["مصر", "سوريا", "العراق", "اليمن", "ليبيا", "تونس", "المغرب", "الجزائر", "السودان", "قطر", "عمان", "الكويت", "الأردن", "لبنان", "فلسطين", "تركيا", "إيران", "فرنسا", "ألمانيا", "إيطاليا", "إسبانيا", "الصين", "اليابان", "الهند", "روسيا", "البرازيل", "كندا", "أمريكا", "بريطانيا"]
 }
 
 @bot.event
@@ -49,11 +48,9 @@ async def on_message(message):
         target_length = game_data["length"]
         content = message.content.strip()
 
-        # التحقق: أن تبدأ بحرف صحيح، طولها مطابق، وموجودة في قائمة الكلمات الصحيحة للفئة
         is_length_match = (len(content) == target_length)
         is_letter_match = content.startswith(target_letter)
         
-        # التحقق من القائمة أو السماح إذا كانت كلمة عربية صحيحة تبدأ بالحرف وبنفس الطول
         category_words = VALID_BUS_WORDS.get(target_cat, [])
         is_valid_word = (content in category_words) or (is_letter_match and is_length_match and len(content) >= 3)
 
@@ -208,7 +205,7 @@ class BusControlView(discord.ui.View):
         await interaction.response.edit_message(embed=games.embed("تم إيقاف اللعبة", f"تم إنهاء لعبة أتوبيس كومبليت بواسطة {interaction.user.mention}.", config.COLORS.get("error", 0xFF0000)), view=self)
 
 async def run_roulette_timer(cid, channel, msg, view):
-    await asyncio.sleep(20) # تم التعديل لتصبح 20 ثانية
+    await asyncio.sleep(20)
     view.stop()
     
     game = roulette_games.pop(cid, None)
@@ -260,7 +257,7 @@ async def run_roulette_timer(cid, channel, msg, view):
 
 class RouletteLobbyView(discord.ui.View):
     def __init__(self, cid):
-        super().__init__(timeout=20) # تم التعديل لتصبح 20 ثانية أيضاً للـ View
+        super().__init__(timeout=20)
         self.cid = cid
 
     @discord.ui.button(label="انضمام", style=discord.ButtonStyle.success)
@@ -416,4 +413,8 @@ class RPSView(discord.ui.View):
                 bot_c_val = random.choice(["Rock", "Paper", "Scissors"])
                 wins = {"Rock": "Scissors", "Scissors": "Paper", "Paper": "Rock"}
                 
-                trans = {"Rock": "ح
+                trans = {"Rock": "حجر", "Paper": "ورقة", "Scissors": "مقص"}
+                res = "تعادل" if choice == bot_c_val else ("لقد فزت" if wins[choice] == bot_c_val else "فاز البوت")
+                
+                await i.response.edit_message(embed=games.embed("حجر ورقة مقص", f"أنت: {trans[choice]}\nالبوت: {trans[bot_c_val]}\n\n**{res}**"), view=None)
+            bt
