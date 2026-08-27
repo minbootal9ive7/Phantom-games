@@ -3,16 +3,21 @@ import asyncio
 import random
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
 from openai import AsyncOpenAI
-import config
-import games
 
-load_dotenv()
+# محاولة تحميل dotenv بشكل آمن بدون ما يوقف السيرفر
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
-# إعداد Grok AI عبر xAI API
+# استخدام المفتاح المباشر أو من متغيرات البيئة
+GROK_KEY = os.getenv("ZXurbdLhWK5zCH6BHgUfxW6NZt0JhzT0gXjVNOS1R6KwdNQoWfNqmou52X0DNIY3p8MeRuQAb5S5RUYP") or "xai-ZXurbdLhWK5zCH6BHgUfxW6NZt0JhzT0gXjVNOS1R6KwdNQoWfNqmou52X0DNIY3p8MeRuQAb5S5RUYP"
+
+# إعداد Grok API عبر مكتبة OpenAI المتوافقة
 grok_client = AsyncOpenAI(
-    api_key=os.getenv("ZXurbdLhWK5zCH6BHgUfxW6NZt0JhzT0gXjVNOS1R6KwdNQoWfNqmou52X0DNIY3p8MeRuQAb5S5RUYP"),
+    api_key=GROK_KEY,
     base_url="https://api.x.ai/v1"
 )
 
@@ -22,7 +27,11 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# قواميس التخزين للألعاب المتنوعة
+# استيراد ملفات الإعدادات المحلية
+import config
+import games
+
+# قواميس التخزين للألعاب
 mafia_games = {}
 chairs_games = {}
 roulette_games = {}
@@ -65,12 +74,10 @@ async def on_message(message):
 
     cid = message.channel.id
 
-    # الاستجابة للعبة أتوبيس كومبليت
     if cid in bus_games:
         g_data = bus_games[cid]
         content = message.content.strip()
 
-        # تحقق فوري من الحرف والطول لتقليل استهلاك الـ API
         if content.startswith(g_data["letter"]) and len(content) == g_data["length"]:
             is_valid = await check_word_with_grok(content, g_data["category"], g_data["letter"])
 
@@ -96,7 +103,6 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# قائمة خيارات الألعاب
 GAME_CHOICES = [
     discord.app_commands.Choice(name="Roulette", value="roulette"),
     discord.app_commands.Choice(name="Mafia", value="mafia"),
@@ -141,7 +147,7 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
                 return await interaction.response.send_message("توجد لعبة روليت تعمل بالفعل.", ephemeral=True)
             
             roulette_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
-            view = RouletteLobbyView(cid)
+            view = games.RouletteLobbyView(cid) if hasattr(games, 'RouletteLobbyView') else None
             
             await interaction.response.send_message(
                 embed=games.embed(
@@ -150,11 +156,9 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
                 ),
                 view=view
             )
-            asyncio.create_task(run_roulette_timer(cid, interaction.channel, await interaction.original_response(), view))
+            if hasattr(games, 'run_roulette_timer'):
+                asyncio.create_task(games.run_roulette_timer(cid, interaction.channel, await interaction.original_response(), view))
             return
-
-        # يمكنك إضافة منطق باقي الألعاب هنا بنفس الهيكلية إذا أردت استدعاء دوالها من games.py
-        await interaction.response.send_message(f"تم اختيار لعبة {choice.name}، جاري تطوير منطقها الخاص.", ephemeral=True)
 
     except Exception as e:
         print(f"Error in game_cmd: {e}")
@@ -179,5 +183,5 @@ class BusControlView(discord.ui.View):
         else:
             await i.response.send_message("اللعبة منتهية بالفعل.", ephemeral=True)
 
-# تشغيل البوت باستخدام التوكن المحفوظ في .env أو config
 bot.run(os.getenv("DISCORD_TOKEN") or getattr(config, "TOKEN", ""))
+            
