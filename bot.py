@@ -5,17 +5,14 @@ import discord
 from discord.ext import commands
 from openai import AsyncOpenAI
 
-# محاولة تحميل dotenv بشكل آمن بدون ما يوقف السيرفر
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     pass
 
-# استخدام المفتاح المباشر أو من متغيرات البيئة
 GROK_KEY = os.getenv("ZXurbdLhWK5zCH6BHgUfxW6NZt0JhzT0gXjVNOS1R6KwdNQoWfNqmou52X0DNIY3p8MeRuQAb5S5RUYP") or "xai-ZXurbdLhWK5zCH6BHgUfxW6NZt0JhzT0gXjVNOS1R6KwdNQoWfNqmou52X0DNIY3p8MeRuQAb5S5RUYP"
 
-# إعداد Grok API عبر مكتبة OpenAI المتوافقة
 grok_client = AsyncOpenAI(
     api_key=GROK_KEY,
     base_url="https://api.x.ai/v1"
@@ -27,11 +24,9 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# استيراد ملفات الإعدادات المحلية
 import config
 import games
 
-# قواميس التخزين للألعاب
 mafia_games = {}
 chairs_games = {}
 roulette_games = {}
@@ -40,7 +35,6 @@ bus_games = {}
 ARABIC_LETTERS = list("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
 BUS_CATEGORIES = ["اسم", "جماد", "حيوان", "نبات", "بلاد"]
 
-# دالة التحقق الذكي باستخدام Grok
 async def check_word_with_grok(word: str, category: str, letter: str) -> bool:
     try:
         prompt = (
@@ -56,7 +50,7 @@ async def check_word_with_grok(word: str, category: str, letter: str) -> bool:
         answer = response.choices[0].message.content.strip()
         return "نعم" in answer
     except Exception as e:
-        print(f"Grok AI Error: {e}")
+        print(f"AI Verification Error: {e}")
         return False
 
 @bot.event
@@ -90,7 +84,7 @@ async def on_message(message):
                 
                 await message.reply(
                     embed=games.embed(
-                        "إجابة صحيحة (Grok 🤖)",
+                        "إجابة صحيحة ✨",
                         f"أحسنت {message.author.mention}! الكلمة (**{content}**) صحيحة.\n\n"
                         f"المطلوب الجديد: **{n_cat}** بحرف **{n_letter}** (طولها **{n_length}** أحرف)",
                         config.COLORS["success"]
@@ -124,6 +118,7 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
     try:
         g, p, cid = choice.value, interaction.user, interaction.channel_id
 
+        # لعبة أتوبيس كومبليت
         if g == "bus":
             if cid in bus_games:
                 return await interaction.response.send_message("أتوبيس كومبليت تعمل بالفعل في هذه القناة.", ephemeral=True)
@@ -138,10 +133,12 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
                 embed=games.embed(
                     "أتوبيس كومبليت",
                     f"المطلوب للجميع: **{cat}** بحرف **{letter}** (تتكون من **{length}** أحرف)\n\n"
-                    f"أكتب الإجابة في الشات! (التحقق الذكي مفعل عبر Grok 🤖)"
-                )
+                    f"أكتب الإجابة في الشات ليتعرف عليها البوت تلقائياً!"
+                ),
+                view=BusControlView(cid, p.id)
             )
 
+        # لعبة الروليت
         if g == "roulette":
             if cid in roulette_games:
                 return await interaction.response.send_message("توجد لعبة روليت تعمل بالفعل.", ephemeral=True)
@@ -159,6 +156,33 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
             if hasattr(games, 'run_roulette_timer'):
                 asyncio.create_task(games.run_roulette_timer(cid, interaction.channel, await interaction.original_response(), view))
             return
+
+        # ربط كافة الألعاب المتبقية بالأزرار والدوال المقابلة لها في ملف games.py
+        game_views = {
+            "mafia": "MafiaLobbyView",
+            "chairs": "ChairsLobbyView",
+            "country": "CountryGameView",
+            "hide": "HideGameView",
+            "dice": "DiceGameView",
+            "replica": "ReplicaGameView",
+            "rps": "RPSGameView",
+            "xo": "XOGameView",
+            "hotxo": "HotXOGameView",
+            "bank": "BankGameView"
+        }
+
+        # تشغيل الدالة المباشرة إن وجدت أو إرفاق زر اللعبة (View)
+        game_func = getattr(games, f"start_{g}", None)
+        if callable(game_func):
+            await game_func(interaction)
+        elif g in game_views and hasattr(games, game_views[g]):
+            view_cls = getattr(games, game_views[g])
+            await interaction.response.send_message(
+                embed=games.embed(f"لعبة {choice.name}", f"تم بدء لعبة {choice.name} بواسطة {p.mention}!"),
+                view=view_cls(cid)
+            )
+        else:
+            await interaction.response.send_message(f"تم بدء لعبة {choice.name}!", ephemeral=True)
 
     except Exception as e:
         print(f"Error in game_cmd: {e}")
@@ -184,4 +208,3 @@ class BusControlView(discord.ui.View):
             await i.response.send_message("اللعبة منتهية بالفعل.", ephemeral=True)
 
 bot.run(os.getenv("DISCORD_TOKEN") or getattr(config, "TOKEN", ""))
-            
