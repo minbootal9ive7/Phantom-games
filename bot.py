@@ -35,7 +35,86 @@ bus_games = {}
 ARABIC_LETTERS = list("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
 BUS_CATEGORIES = ["اسم", "جماد", "حيوان", "نبات", "بلاد"]
 
-# كلاس أزرار الروليت
+# دالة تنظيف النص العربي المقارن
+def normalize_arabic(text):
+    text = text.strip()
+    replacements = {
+        'أ': 'ا', 'إ': 'ا', 'آ': 'ا',
+        'ى': 'ي', 'ة': 'ه'
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+# دالة التحقق الذكي عبر Grok المحسّنة
+async def check_word_with_grok(word: str, category: str, letter: str) -> bool:
+    try:
+        prompt = (
+            f"هل الكلمة التالية: '{word}' تعتبر {category} صحيح ومعروف باللغة العربية ويبدأ بحرف '{letter}'؟\n"
+            f"ملاحظة: تجاهل تشكيل الحروف والهمزات. قم بالإجابة بكلمة واحدة فقط إما 'نعم' أو 'لا'."
+        )
+        response = await grok_client.chat.completions.create(
+            model="grok-2-latest", # تم التحديث لأحدث موديل ثابت وموثوق
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=10
+        )
+        answer = response.choices[0].message.content.strip()
+        print(f"[Grok Check] Word: '{word}' | Cat: '{category}' | Letter: '{letter}' | AI Answer: '{answer}'")
+        return "نعم" in answer or "صح" in answer
+    except Exception as e:
+        print(f"AI Verification Error: {e}")
+        # fallback بسيط في حالة خطأ السيرفر
+        return normalize_arabic(word).startswith(normalize_arabic(letter))
+
+@bot.event
+async def on_ready():
+    try:
+        synced = await bot.tree.sync()
+        print(f"Bot online | Synced {len(synced)} commands")
+    except Exception as e:
+        print(f"Sync error: {e}")
+
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+
+    cid = message.channel.id
+
+    if cid in bus_games:
+        g_data = bus_games[cid]
+        content = message.content.strip()
+        
+        # التأكد محلياً أولاً أن الكلمة تبدأ بحرف مشابه
+        req_letter = normalize_arabic(g_data["letter"])
+        user_letter = normalize_arabic(content[0]) if content else ""
+
+        if user_letter == req_letter:
+            is_valid = await check_word_with_grok(content, g_data["category"], g_data["letter"])
+
+            if is_valid:
+                n_letter = random.choice(ARABIC_LETTERS)
+                n_cat = random.choice(BUS_CATEGORIES)
+
+                bus_games[cid].update({"letter": n_letter, "category": n_cat})
+                
+                await message.reply(
+                    embed=games.embed(
+                        "إجابة صحيحة ✨",
+                        f"أحسنت {message.author.mention}! الكلمة (**{content}**) صحيحة 🎉\n\n"
+                        f"المطلوب الجديد: **{n_cat}** بحرف **{n_letter}**",
+                        config.COLORS["success"]
+                    ),
+                    view=BusControlView(cid, g_data["host"])
+                )
+                return
+            else:
+                await message.add_reaction("❌")
+
+    await bot.process_commands(message)
+
+# أزرار لعبة الروليت
 class RouletteLobbyView(discord.ui.View):
     def __init__(self, cid):
         super().__init__(timeout=20)
@@ -80,69 +159,6 @@ async def run_roulette_game(cid, channel):
     loser = random.choice(players)
     await channel.send(f"💥 **دارت عجلة الروليت...** والخاسر هو: {loser.mention} 💀")
 
-# دالة التحقق الذكي عبر Grok (بدون تقييد بطول الكلمة)
-async def check_word_with_grok(word: str, category: str, letter: str) -> bool:
-    try:
-        prompt = (
-            f"هل كلمة '{word}' هي اسم {category} صحيح معروف باللغة العربية ويبدأ بحرف '{letter}'؟ "
-            f"أجب بكلمة واحدة فقط: نعم أو لا."
-        )
-        response = await grok_client.chat.completions.create(
-            model="grok-beta",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
-            max_tokens=5
-        )
-        answer = response.choices[0].message.content.strip()
-        return "نعم" in answer
-    except Exception as e:
-        print(f"AI Verification Error: {e}")
-        return False
-
-@bot.event
-async def on_ready():
-    try:
-        synced = await bot.tree.sync()
-        print(f"Bot online | Synced {len(synced)} commands")
-    except Exception as e:
-        print(f"Sync error: {e}")
-
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-
-    cid = message.channel.id
-
-    if cid in bus_games:
-        g_data = bus_games[cid]
-        content = message.content.strip()
-
-        # التحقق الأول المبسط: هل تبدأ بالحرف المطلوب فقط؟
-        if content.startswith(g_data["letter"]):
-            is_valid = await check_word_with_grok(content, g_data["category"], g_data["letter"])
-
-            if is_valid:
-                n_letter = random.choice(ARABIC_LETTERS)
-                n_cat = random.choice(BUS_CATEGORIES)
-
-                bus_games[cid].update({"letter": n_letter, "category": n_cat})
-                
-                await message.reply(
-                    embed=games.embed(
-                        "إجابة صحيحة ✨",
-                        f"أحسنت {message.author.mention}! الكلمة (**{content}**) صحيحة.\n\n"
-                        f"المطلوب الجديد: **{n_cat}** بحرف **{n_letter}**",
-                        config.COLORS["success"]
-                    ),
-                    view=BusControlView(cid, g_data["host"])
-                )
-                return
-            else:
-                await message.add_reaction("❌")
-
-    await bot.process_commands(message)
-
 GAME_CHOICES = [
     discord.app_commands.Choice(name="Roulette", value="roulette"),
     discord.app_commands.Choice(name="Mafia", value="mafia"),
@@ -175,9 +191,9 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
             
             return await interaction.response.send_message(
                 embed=games.embed(
-                    "أتوبيس كومبليت",
+                    "أتوبيس كومبليت 🚌",
                     f"المطلوب للجميع: **{cat}** بحرف **{letter}**\n\n"
-                    f"أكتب الكلمة في الشات مباشرة وسيتم التحقق منها تلقائياً!"
+                    f"أكتب الكلمة في الشات مباشرة ليتعرف عليها البوت!"
                 ),
                 view=BusControlView(cid, p.id)
             )
@@ -248,4 +264,3 @@ class BusControlView(discord.ui.View):
             await i.response.send_message("اللعبة منتهية بالفعل.", ephemeral=True)
 
 bot.run(os.getenv("DISCORD_TOKEN") or getattr(config, "TOKEN", ""))
-                         
