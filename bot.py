@@ -11,7 +11,7 @@ try:
 except ImportError:
     pass
 
-GROK_KEY = os.getenv("ZXurbdLhWK5zCH6BHgUfxW6NZt0JhzT0gXjVNOS1R6KwdNQoWfNqmou52X0DNIY3p8MeRuQAb5S5RUYP") or "xai-ZXurbdLhWK5zCH6BHgUfxW6NZt0JhzT0gXjVNOS1R6KwdNQoWfNqmou52X0DNIY3p8MeRuQAb5S5RUYP"
+GROK_KEY = os.getenv("GROK_API_KEY") or "xai-ZXurbdLhWK5zCH6BHgUfxW6NZt0JhzT0gXjVNOS1R6KwdNQoWfNqmou52X0DNIY3p8MeRuQAb5S5RUYP"
 
 grok_client = AsyncOpenAI(
     api_key=GROK_KEY,
@@ -34,6 +34,51 @@ bus_games = {}
 
 ARABIC_LETTERS = list("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
 BUS_CATEGORIES = ["اسم", "جماد", "حيوان", "نبات", "بلاد"]
+
+# كلاس أزرار الروليت (الانضمام والانسحاب)
+class RouletteLobbyView(discord.ui.View):
+    def __init__(self, cid):
+        super().__init__(timeout=20)
+        self.cid = cid
+
+    @discord.ui.button(label="انضمام 🎯", style=discord.ButtonStyle.success)
+    async def join_game(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.cid in roulette_games:
+            game = roulette_games[self.cid]
+            user = interaction.user
+            if user.id not in game["players"]:
+                game["players"][user.id] = user
+                await interaction.response.send_message(f"🎯 انضم {user.mention} إلى الروليت!", ephemeral=False)
+            else:
+                await interaction.response.send_message("أنت مضاف في اللعبة بالفعل!", ephemeral=True)
+        else:
+            await interaction.response.send_message("اللعبة منتهية أو غير موجودة.", ephemeral=True)
+
+    @discord.ui.button(label="إنسحاب ❌", style=discord.ButtonStyle.danger)
+    async def leave_game(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.cid in roulette_games:
+            game = roulette_games[self.cid]
+            user = interaction.user
+            if user.id in game["players"]:
+                del game["players"][user.id]
+                await interaction.response.send_message(f"❌ انسحب {user.mention} من اللعبة.", ephemeral=False)
+            else:
+                await interaction.response.send_message("أنت لست مشاركاً في اللعبة.", ephemeral=True)
+
+async def run_roulette_game(cid, channel):
+    await asyncio.sleep(20)
+    if cid not in roulette_games:
+        return
+    
+    game = roulette_games.pop(cid)
+    players = list(game["players"].values())
+
+    if len(players) < 2:
+        await channel.send("تم إلغاء لعبة الروليت لعدم اكتمال عدد اللاعبين (مطلوب لاعبين على الأقل).")
+        return
+
+    loser = random.choice(players)
+    await channel.send(f"💥 **دارت عجلة الروليت...** والخاسر هو: {loser.mention} 💀")
 
 async def check_word_with_grok(word: str, category: str, letter: str) -> bool:
     try:
@@ -118,7 +163,6 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
     try:
         g, p, cid = choice.value, interaction.user, interaction.channel_id
 
-        # لعبة أتوبيس كومبليت
         if g == "bus":
             if cid in bus_games:
                 return await interaction.response.send_message("أتوبيس كومبليت تعمل بالفعل في هذه القناة.", ephemeral=True)
@@ -138,26 +182,23 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
                 view=BusControlView(cid, p.id)
             )
 
-        # لعبة الروليت
         if g == "roulette":
             if cid in roulette_games:
                 return await interaction.response.send_message("توجد لعبة روليت تعمل بالفعل.", ephemeral=True)
             
             roulette_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
-            view = games.RouletteLobbyView(cid) if hasattr(games, 'RouletteLobbyView') else None
+            view = RouletteLobbyView(cid)
             
             await interaction.response.send_message(
                 embed=games.embed(
-                    "لعبة الروليت",
-                    f"المنشئ: {p.mention}\nاللاعبون: 1\n\nاضغط للانضمام خلال 20 ثانية!"
+                    "لعبة الروليت 🎰",
+                    f"المنشئ: {p.mention}\n\nاضغط على الأزرار بالأسفل للانضمام أو الانسحاب قبل انتهاء الـ 20 ثانية!"
                 ),
                 view=view
             )
-            if hasattr(games, 'run_roulette_timer'):
-                asyncio.create_task(games.run_roulette_timer(cid, interaction.channel, await interaction.original_response(), view))
+            asyncio.create_task(run_roulette_game(cid, interaction.channel))
             return
 
-        # ربط كافة الألعاب المتبقية بالأزرار والدوال المقابلة لها في ملف games.py
         game_views = {
             "mafia": "MafiaLobbyView",
             "chairs": "ChairsLobbyView",
@@ -171,7 +212,6 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
             "bank": "BankGameView"
         }
 
-        # تشغيل الدالة المباشرة إن وجدت أو إرفاق زر اللعبة (View)
         game_func = getattr(games, f"start_{g}", None)
         if callable(game_func):
             await game_func(interaction)
@@ -208,3 +248,4 @@ class BusControlView(discord.ui.View):
             await i.response.send_message("اللعبة منتهية بالفعل.", ephemeral=True)
 
 bot.run(os.getenv("DISCORD_TOKEN") or getattr(config, "TOKEN", ""))
+            
