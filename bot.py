@@ -46,7 +46,7 @@ def normalize_arabic(text):
         text = text.replace(old, new)
     return text
 
-# دالة التحقق الذكي والدقيق عبر Grok (تتحقق من النوع والحرف بدون النظر لعدد الحروف)
+# دالة التحقق الذكي والدقيق عبر Grok
 async def check_word_with_grok(word: str, category: str, letter: str) -> bool:
     try:
         prompt = (
@@ -77,6 +77,52 @@ async def check_word_with_grok(word: str, category: str, letter: str) -> bool:
         print(f"AI Verification Error: {e}")
         return False
 
+# واجهة لوبي الانضمام لأتوبيس كومبليت
+class BusLobbyView(discord.ui.View):
+    def __init__(self, cid, host_id):
+        super().__init__(timeout=120)
+        self.cid = cid
+        self.host_id = host_id
+
+    @discord.ui.button(label="انضمام 🎯", style=discord.ButtonStyle.success)
+    async def join_bus(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.cid in bus_games:
+            game = bus_games[self.cid]
+            if game["started"]:
+                return await interaction.response.send_message("اللعبة بدأت بالفعل!", ephemeral=True)
+            
+            user = interaction.user
+            if user.id not in game["players"]:
+                game["players"].append(user.id)
+                await interaction.response.send_message(f"🎯 انضم {user.mention} إلى أتوبيس كومبليت!", ephemeral=False)
+            else:
+                await interaction.response.send_message("أنت مضاف في اللعبة بالفعل!", ephemeral=True)
+
+    @discord.ui.button(label="بدء اللعبة ▶️", style=discord.ButtonStyle.primary)
+    async def start_bus(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.host_id:
+            return await interaction.response.send_message("فقط صاحب اللعبة يمكنه بدئها!", ephemeral=True)
+
+        game = bus_games.get(self.cid)
+        if not game:
+            return await interaction.response.send_message("اللعبة غير موجودة.", ephemeral=True)
+
+        if len(game["players"]) == 0:
+            return await interaction.response.send_message("يجب انضمام لاعب واحد على الأقل لبدء اللعبة!", ephemeral=True)
+
+        game["started"] = True
+        
+        await interaction.response.edit_message(
+            embed=games.embed(
+                "بدأت اللعبة 🚌",
+                f"اللاعبون المشاركون: {len(game['players'])}\n\n"
+                f"المطلوب الآن: **{game['category']}** بحرف **{game['letter']}**\n\n"
+                f"ملاحظة: اللعبة تشمل فقط اللاعبين الذين انضموا!",
+                config.COLORS["success"]
+            ),
+            view=BusControlView(self.cid, self.host_id)
+        )
+
 @bot.event
 async def on_ready():
     try:
@@ -94,45 +140,44 @@ async def on_message(message):
 
     if cid in bus_games:
         g_data = bus_games[cid]
-        content = message.content.strip()
+        
+        # التأكد من أن اللعبة بدأت وأن المرسل من ضمن اللاعبين المنضمين حصراً
+        if g_data["started"] and message.author.id in g_data["players"]:
+            content = message.content.strip()
 
-        if not content:
-            return
-
-        # تحقق أولي محلي: هل يبدأ الحرف بـ الحرف المطلوب (مع توحيد الهمزات)؟
-        req_letter = normalize_arabic(g_data["letter"])
-        user_first_letter = normalize_arabic(content[0])
-
-        if user_first_letter == req_letter:
-            # التحقق الدقيق من الذكاء الاصطناعي على الفئة والنوع
-            is_valid = await check_word_with_grok(content, g_data["category"], g_data["letter"])
-
-            if is_valid:
-                n_letter = random.choice(ARABIC_LETTERS)
-                n_cat = random.choice(BUS_CATEGORIES)
-
-                bus_games[cid].update({"letter": n_letter, "category": n_cat})
-                
-                await message.reply(
-                    embed=games.embed(
-                        "إجابة صحيحة ✨",
-                        f"أحسنت {message.author.mention}! الكلمة (**{content}**) صحيحة 🎉\n\n"
-                        f"المطلوب الجديد: **{n_cat}** بحرف **{n_letter}**",
-                        config.COLORS["success"]
-                    ),
-                    view=BusControlView(cid, g_data["host"])
-                )
+            if not content:
                 return
+
+            req_letter = normalize_arabic(g_data["letter"])
+            user_first_letter = normalize_arabic(content[0])
+
+            if user_first_letter == req_letter:
+                is_valid = await check_word_with_grok(content, g_data["category"], g_data["letter"])
+
+                if is_valid:
+                    n_letter = random.choice(ARABIC_LETTERS)
+                    n_cat = random.choice(BUS_CATEGORIES)
+
+                    bus_games[cid].update({"letter": n_letter, "category": n_cat})
+                    
+                    await message.reply(
+                        embed=games.embed(
+                            "إجابة صحيحة ✨",
+                            f"أحسنت {message.author.mention}! الكلمة (**{content}**) صحيحة 🎉\n\n"
+                            f"المطلوب الجديد: **{n_cat}** بحرف **{n_letter}**",
+                            config.COLORS["success"]
+                        ),
+                        view=BusControlView(cid, g_data["host"])
+                    )
+                    return
+                else:
+                    await message.add_reaction("❌")
             else:
-                # الكلمة لا تطابق النوع المطلوب (مثلاً اسم بدلاً من حيوان)
                 await message.add_reaction("❌")
-        else:
-            # الحرف الأول غير مطابقة
-            await message.add_reaction("❌")
 
     await bot.process_commands(message)
 
-# أزرار لعبة الروليت
+# باقي أزرار التحكم بالروليت
 class RouletteLobbyView(discord.ui.View):
     def __init__(self, cid):
         super().__init__(timeout=20)
@@ -205,15 +250,21 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
             letter = random.choice(ARABIC_LETTERS)
             cat = random.choice(BUS_CATEGORIES)
 
-            bus_games[cid] = {"letter": letter, "category": cat, "host": p.id}
+            bus_games[cid] = {
+                "letter": letter, 
+                "category": cat, 
+                "host": p.id,
+                "players": [p.id], # صاحب اللعبة ينضم تلقائياً
+                "started": False
+            }
             
             return await interaction.response.send_message(
                 embed=games.embed(
-                    "أتوبيس كومبليت 🚌",
-                    f"المطلوب للجميع: **{cat}** بحرف **{letter}**\n\n"
-                    f"أكتب الكلمة في الشات مباشرة وسيتم التحقق من نوعها وصحتها تلقائياً!"
+                    "تجهيز أتوبيس كومبليت 🚌",
+                    f"أنشأ {p.mention} لعبة جديدة!\n\n"
+                    f"اضغط على **انضمام 🎯** للمشاركة في اللعبة، وعند الاكتفاء اضغط على **بدء اللعبة ▶️**"
                 ),
-                view=BusControlView(cid, p.id)
+                view=BusLobbyView(cid, p.id)
             )
 
         if g == "roulette":
@@ -282,4 +333,4 @@ class BusControlView(discord.ui.View):
             await i.response.send_message("اللعبة منتهية بالفعل.", ephemeral=True)
 
 bot.run(os.getenv("DISCORD_TOKEN") or getattr(config, "TOKEN", ""))
-                
+    
