@@ -35,7 +35,7 @@ bus_games = {}
 ARABIC_LETTERS = list("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
 BUS_CATEGORIES = ["اسم", "جماد", "حيوان", "نبات", "بلاد"]
 
-# دالة تنظيف النص العربي المقارن
+# دالة لتنظيف وتوحيد الأحرف العربية للحرف الأول
 def normalize_arabic(text):
     text = text.strip()
     replacements = {
@@ -46,26 +46,36 @@ def normalize_arabic(text):
         text = text.replace(old, new)
     return text
 
-# دالة التحقق الذكي عبر Grok المحسّنة
+# دالة التحقق الذكي والدقيق عبر Grok (تتحقق من النوع والحرف بدون النظر لعدد الحروف)
 async def check_word_with_grok(word: str, category: str, letter: str) -> bool:
     try:
         prompt = (
-            f"هل الكلمة التالية: '{word}' تعتبر {category} صحيح ومعروف باللغة العربية ويبدأ بحرف '{letter}'؟\n"
-            f"ملاحظة: تجاهل تشكيل الحروف والهمزات. قم بالإجابة بكلمة واحدة فقط إما 'نعم' أو 'لا'."
+            f"تدقيق دقيق جداً للعبة أتوبيس كومبليت:\n"
+            f"الكلمة المقدمة: '{word}'\n"
+            f"الفئة المطلوبة: '{category}'\n"
+            f"الحرف المطلوب: '{letter}'\n\n"
+            f"الشروط:\n"
+            f"1. يجب أن تبدأ الكلمة بالحرف '{letter}' (تجاهل التشكيل والهمزات).\n"
+            f"2. يجب أن تكون الكلمة بالتأكيد تنتمي لفئة ({category}) فقط.\n"
+            f"أمثلة للتدقيق الصارم:\n"
+            f"- 'تامر' هو اسم شخص، لذلك إذا كانت الفئة (حيوان) الإجابة 'لا'.\n"
+            f"- 'تفاح' هو نبات/فاكهة، إذا كانت الفئة (حيوان) الإجابة 'لا'.\n"
+            f"- 'تمساح' هو حيوان ويبدأ بحرف ت، فالإجابة 'نعم'.\n\n"
+            f"هل الكلمة '{word}' تلتزم بالشرطين بشكل صحيح 100%؟\n"
+            f"أجب بكلمة واحدة فقط: نعم أم لا."
         )
         response = await grok_client.chat.completions.create(
-            model="grok-2-latest", # تم التحديث لأحدث موديل ثابت وموثوق
+            model="grok-2-latest",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
-            max_tokens=10
+            max_tokens=5
         )
         answer = response.choices[0].message.content.strip()
         print(f"[Grok Check] Word: '{word}' | Cat: '{category}' | Letter: '{letter}' | AI Answer: '{answer}'")
-        return "نعم" in answer or "صح" in answer
+        return "نعم" in answer
     except Exception as e:
         print(f"AI Verification Error: {e}")
-        # fallback بسيط في حالة خطأ السيرفر
-        return normalize_arabic(word).startswith(normalize_arabic(letter))
+        return False
 
 @bot.event
 async def on_ready():
@@ -85,12 +95,16 @@ async def on_message(message):
     if cid in bus_games:
         g_data = bus_games[cid]
         content = message.content.strip()
-        
-        # التأكد محلياً أولاً أن الكلمة تبدأ بحرف مشابه
-        req_letter = normalize_arabic(g_data["letter"])
-        user_letter = normalize_arabic(content[0]) if content else ""
 
-        if user_letter == req_letter:
+        if not content:
+            return
+
+        # تحقق أولي محلي: هل يبدأ الحرف بـ الحرف المطلوب (مع توحيد الهمزات)؟
+        req_letter = normalize_arabic(g_data["letter"])
+        user_first_letter = normalize_arabic(content[0])
+
+        if user_first_letter == req_letter:
+            # التحقق الدقيق من الذكاء الاصطناعي على الفئة والنوع
             is_valid = await check_word_with_grok(content, g_data["category"], g_data["letter"])
 
             if is_valid:
@@ -110,7 +124,11 @@ async def on_message(message):
                 )
                 return
             else:
+                # الكلمة لا تطابق النوع المطلوب (مثلاً اسم بدلاً من حيوان)
                 await message.add_reaction("❌")
+        else:
+            # الحرف الأول غير مطابقة
+            await message.add_reaction("❌")
 
     await bot.process_commands(message)
 
@@ -193,7 +211,7 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
                 embed=games.embed(
                     "أتوبيس كومبليت 🚌",
                     f"المطلوب للجميع: **{cat}** بحرف **{letter}**\n\n"
-                    f"أكتب الكلمة في الشات مباشرة ليتعرف عليها البوت!"
+                    f"أكتب الكلمة في الشات مباشرة وسيتم التحقق من نوعها وصحتها تلقائياً!"
                 ),
                 view=BusControlView(cid, p.id)
             )
@@ -264,3 +282,4 @@ class BusControlView(discord.ui.View):
             await i.response.send_message("اللعبة منتهية بالفعل.", ephemeral=True)
 
 bot.run(os.getenv("DISCORD_TOKEN") or getattr(config, "TOKEN", ""))
+                
