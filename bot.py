@@ -35,7 +35,7 @@ bus_games = {}
 ARABIC_LETTERS = list("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
 BUS_CATEGORIES = ["اسم", "جماد", "حيوان", "نبات", "بلاد"]
 
-# كلاس أزرار الروليت (الانضمام والانسحاب)
+# كلاس أزرار الروليت
 class RouletteLobbyView(discord.ui.View):
     def __init__(self, cid):
         super().__init__(timeout=20)
@@ -80,6 +80,7 @@ async def run_roulette_game(cid, channel):
     loser = random.choice(players)
     await channel.send(f"💥 **دارت عجلة الروليت...** والخاسر هو: {loser.mention} 💀")
 
+# دالة التحقق الذكي عبر Grok (بدون تقييد بطول الكلمة)
 async def check_word_with_grok(word: str, category: str, letter: str) -> bool:
     try:
         prompt = (
@@ -117,21 +118,21 @@ async def on_message(message):
         g_data = bus_games[cid]
         content = message.content.strip()
 
-        if content.startswith(g_data["letter"]) and len(content) == g_data["length"]:
+        # التحقق الأول المبسط: هل تبدأ بالحرف المطلوب فقط؟
+        if content.startswith(g_data["letter"]):
             is_valid = await check_word_with_grok(content, g_data["category"], g_data["letter"])
 
             if is_valid:
                 n_letter = random.choice(ARABIC_LETTERS)
                 n_cat = random.choice(BUS_CATEGORIES)
-                n_length = random.randint(3, 5)
 
-                bus_games[cid].update({"letter": n_letter, "category": n_cat, "length": n_length})
+                bus_games[cid].update({"letter": n_letter, "category": n_cat})
                 
                 await message.reply(
                     embed=games.embed(
                         "إجابة صحيحة ✨",
                         f"أحسنت {message.author.mention}! الكلمة (**{content}**) صحيحة.\n\n"
-                        f"المطلوب الجديد: **{n_cat}** بحرف **{n_letter}** (طولها **{n_length}** أحرف)",
+                        f"المطلوب الجديد: **{n_cat}** بحرف **{n_letter}**",
                         config.COLORS["success"]
                     ),
                     view=BusControlView(cid, g_data["host"])
@@ -169,15 +170,14 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
             
             letter = random.choice(ARABIC_LETTERS)
             cat = random.choice(BUS_CATEGORIES)
-            length = random.randint(3, 5)
 
-            bus_games[cid] = {"letter": letter, "category": cat, "length": length, "host": p.id}
+            bus_games[cid] = {"letter": letter, "category": cat, "host": p.id}
             
             return await interaction.response.send_message(
                 embed=games.embed(
                     "أتوبيس كومبليت",
-                    f"المطلوب للجميع: **{cat}** بحرف **{letter}** (تتكون من **{length}** أحرف)\n\n"
-                    f"أكتب الإجابة في الشات ليتعرف عليها البوت تلقائياً!"
+                    f"المطلوب للجميع: **{cat}** بحرف **{letter}**\n\n"
+                    f"أكتب الكلمة في الشات مباشرة وسيتم التحقق منها تلقائياً!"
                 ),
                 view=BusControlView(cid, p.id)
             )
@@ -248,4 +248,4 @@ class BusControlView(discord.ui.View):
             await i.response.send_message("اللعبة منتهية بالفعل.", ephemeral=True)
 
 bot.run(os.getenv("DISCORD_TOKEN") or getattr(config, "TOKEN", ""))
-            
+                         
