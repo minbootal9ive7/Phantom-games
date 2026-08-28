@@ -43,7 +43,7 @@ def normalize_arabic(text):
         text = text.replace(old, new)
     return text
 
-# دالة التحقق الذكي عبر Grok AI للتأكد من تطابق الكلمة مع الفئة والحرف
+# دالة التحقق الذكي عبر Grok AI للتأكد من أن الكلمة تنتمي للفئة والحرف المطلوبين
 async def check_word_with_ai(word: str, category: str, letter: str) -> bool:
     clean_word = normalize_arabic(word)
     try:
@@ -93,16 +93,16 @@ async def on_message(message):
             req_letter = normalize_arabic(g_data["letter"])
             user_first_letter = normalize_arabic(content[0])
 
-            # التحقق من أن الحرف الأول صحيح أولاً
+            # التحقق أولاً من الحرف الأول
             if user_first_letter == req_letter:
-                # التحقق عبر الذكاء الاصطناعي من أن الكلمة تنتمي للفئة المطلوبة
+                # التحقق الذكي عبر AI من أن الكلمة تنتمي للفئة المطلوبة فعلاً
                 is_valid = await check_word_with_ai(content, g_data["category"], g_data["letter"])
 
                 if is_valid:
                     n_letter, n_cat = random.choice(ARABIC_LETTERS), random.choice(BUS_CATEGORIES)
                     bus_games[cid].update({"letter": n_letter, "category": n_cat})
                     await message.reply(
-                        embed=games.embed("إجابة صحيحة ✨", f"أحسنت {message.author.mention}! الكلمة (**{message.content}**) صحيحة وتنتمي للفئة.\n\nالمطلوب الجديد: **{n_cat}** بحرف **{n_letter}**", config.COLORS["success"]),
+                        embed=games.embed("إجابة صحيحة ✨", f"أحسنت {message.author.mention}! الكلمة (**{message.content}**) صحيحة وتتطابق مع الفئة.\n\nالمطلوب الجديد: **{n_cat}** بحرف **{n_letter}**", config.COLORS["success"]),
                         view=BusControlView(cid, g_data["host"])
                     )
                     return
@@ -213,7 +213,7 @@ class BusLobbyView(discord.ui.View):
         await i.response.edit_message(
             embed=games.embed(
                 "أتوبيس كومبليت 🚌",
-                f"اللاعبون المشاركون: {len(game['players'])}\n\nالمطلوب للجميع: **{game['category']}** بحرف **{game['letter']}**\n\nأكتب الإجابة المناسبة في الشات!"
+                f"اللاعبون المشاركون: {len(game['players'])}\n\nالمطلوب للجميع: **{game['category']}** بحرف **{game['letter']}**\n\nأكتب الكلمة الصحيحة في الشات!"
             ),
             view=BusControlView(self.cid, self.host_id)
         )
