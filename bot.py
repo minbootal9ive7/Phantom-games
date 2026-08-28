@@ -119,9 +119,9 @@ async def on_message(message):
                     )
                     return
                 else:
-                    await message.add_reaction("❌")
+                    await message.reply("إجابتك غلط")
             else:
-                await message.add_reaction("❌")
+                await message.reply("إجابتك غلط")
 
     await bot.process_commands(message)
 
