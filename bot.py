@@ -60,7 +60,7 @@ VALID_BUS_WORDS = {
         'د': ["درج", "دولاب", "دفتر", "دراجة", "دلو", "درع"],
         'ذ': ["ذهب", "ذراع", "ذيل"],
         'ر': ["راديو", "رسالة", "رمان", "رمح", "رف", "رصاص"],
-        'ز': ["زجاجة", "زيت", "زر", "زهرية", "نبيل"],
+        'ز': ["زجاجة", "زيت", "زر", "زهرية"],
         'س': ["سجادة", "سيارة", "سرير", "ساعة", "سيف", "سكين"],
         'ش': ["شباك", "شارع", "شاشه", "شمعدان", "شوكة", "شاحن"],
         'ص': ["صندوق", "صواني", "صاروخ", "صنبور", "صخرة"],
@@ -75,8 +75,8 @@ VALID_BUS_WORDS = {
         'ل': ["لعبة", "لمبة", "لحاف", "لجام", "لوحة"],
         'م': ["مكتب", "مفتاح", "مقص", "مرآة", "مروحة", "مطرقة"],
         'ن': ["نجفة", "نظارة", "نهر", "وسادة", "نرد"],
-        'ه': ["هاتف", "هرم", "وسادة"],
-        'و': ["وسادة", "ورقة", "وسام", "وعاء", "وسادة"],
+        'ه': ["هاتف", "هرم"],
+        'و': ["ورقة", "وسام", "وعاء"],
         'ي': ["يد", "يخوت", "يمامة"]
     },
     "حيوان": {
@@ -84,7 +84,7 @@ VALID_BUS_WORDS = {
         'ب': ["بطة", "بقرة", "بومة", "باز", "ببر", "بلبل", "ببغاء"],
         'ت': ["تمساح", "ترس", "تيس", "تنين"],
         'ث': ["ثعلب", "ثور", "ثعبان"],
-        'ج': ["جمل", "جاموس", "جرو", "جراد", "جمل"],
+        'ج': ["جمل", "جاموس", "جرو", "جراد"],
         'ح': ["حصان", "حمار", "حوت", "حمام", "حرباء", "حمار وحشي"],
         'خ': ["خروف", "خنزير", "خلد", "خرتيت", "خطاف"],
         'د': ["دب", "دجاجة", "دولفين", "ديك", "دفدع", "دود"],
@@ -103,7 +103,7 @@ VALID_BUS_WORDS = {
         'ق': ["قرد", "قط", "قنفذ", "قندس", "قرش", "قطط"],
         'ك': ["كلب", "كنغر", "كوالا"],
         'ل': ["ليمور"],
-        'م': ["ماعز", "معز", "نمر"],
+        'م': ["ماعز", "معز"],
         'ن': ["نمر", "نسر", "ناقة", "نعامة", "نحلة", "نورس"],
         'ه': ["هدهد", "هامستر", "هراس"],
         'و': ["وعل", "ورل", "واسط"],
@@ -182,27 +182,23 @@ def normalize_arabic(text):
         text = text.replace(old, new)
     return text
 
-# دالة للتحقق التلقائي والذكي من الكلمة في الفئة والحرف
+# دالة التحقق الصارمة (تتأكد من الحرف والفئة بالاعتماد على القاموس حصراً)
 def check_word_validity(word: str, category: str, letter: str) -> bool:
     clean_word = normalize_arabic(word)
     clean_letter = normalize_arabic(letter)
     
-    # 1. التحقق من الحرف الأول أولاً
+    # 1. التأكد أن الكلمة تبدأ بالحرف المطلوب
     if not clean_word.startswith(clean_letter):
         return False
         
-    # 2. البحث في القاموس الداخلي للفئة والحرف
+    # 2. البحث حصراً داخل القاموس المخصص لهذه الفئة وهذا الحرف
     cat_dict = VALID_BUS_WORDS.get(category, {})
     possible_words = cat_dict.get(letter, [])
     
-    # تنظيف كلمات القاموس للمقارنة الصحيحة
     normalized_db_words = [normalize_arabic(w) for w in possible_words]
     
+    # 3. يجب أن تكون الكلمة موجودة في القاموس الصحيح للفئة المطلوبة
     if clean_word in normalized_db_words:
-        return True
-        
-    # 3. مرونة إضافية: إذا كانت الكلمة تبدأ بالحرف المطلوب وطولها مناسب وليست مجرد أحرف عشوائية، نقبلها لتكون اللعبة ممتعة
-    if len(clean_word) >= 2:
         return True
         
     return False
@@ -222,13 +218,11 @@ async def on_message(message):
     cid = message.channel.id
     if cid in bus_games:
         g_data = bus_games[cid]
-        # التحقق من أن اللعبة بدأت وأن مرسل الرسالة من ضمن اللاعبين المنضمين
         if g_data.get("started", False) and message.author.id in g_data["players"]:
             content = message.content.strip()
             if not content:
                 return
             
-            # التحقق الفعلي من الحرف والفئة
             is_valid = check_word_validity(content, g_data["category"], g_data["letter"])
 
             if is_valid:
@@ -315,7 +309,6 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
         if not interaction.response.is_done():
             await interaction.response.send_message("حدث خطأ أثناء تشغيل اللعبة.", ephemeral=True)
 
-# واجهة لوبي أتوبيس كومبليت بالزرار
 class BusLobbyView(discord.ui.View):
     def __init__(self, cid, host_id):
         super().__init__(timeout=120)
