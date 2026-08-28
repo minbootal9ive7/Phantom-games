@@ -191,8 +191,13 @@ def check_word_validity(word: str, category: str, letter: str) -> bool:
 @bot.event
 async def on_ready():
     try:
-        synced = await bot.tree.sync()
-        print(f"Bot online | Synced {len(synced)} commands")
+        # مزامنة فورية للأوامر على سيرفرك المحدد خصيصاً
+        guild_id = 1527415229279895744
+        guild = discord.Object(id=guild_id)
+        
+        bot.tree.copy_global_to(guild=guild)
+        synced = await bot.tree.sync(guild=guild)
+        print(f"Bot online | Synced {len(synced)} commands to guild {guild_id}.")
     except Exception as e:
         print(f"Sync error: {e}")
 
@@ -223,7 +228,7 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# ==================== أمر الإيقاف (Stop Command) ====================
+# ==================== أوامر الإيقاف (Stop Command) ====================
 @bot.tree.command(name="stop", description="إيقاف أي لعبة جارية في هذه الروم")
 async def stop_cmd(interaction: discord.Interaction):
     cid = interaction.channel_id
@@ -253,7 +258,6 @@ async def stop_prefix(ctx):
         await ctx.send(embed=games.embed("تم إيقاف اللعبة 🛑", f"تم إنهاء جميع الألعاب النشطة في هذه الروم بواسطة {ctx.author.mention}", 0xFF0000))
     else:
         await ctx.send("لا توجد أي لعبة تعمل حالياً في هذه الروم لإيقافها.")
-
 # ====================================================================
 
 GAME_CHOICES = [
