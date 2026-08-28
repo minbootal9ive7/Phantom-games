@@ -17,7 +17,6 @@ mafia_games, chairs_games, roulette_games, bus_games = {}, {}, {}, {}
 ARABIC_LETTERS = list("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
 BUS_CATEGORIES = ["اسم", "جماد", "حيوان", "نبات", "بلاد"]
 
-# قاعدة بيانات داخلية شاملة وموسعة للتحقق الفوري من صحة الكلمات حسب الفئة والحرف
 VALID_BUS_WORDS = {
     "اسم": {
         'ا': ["احمد", "ابراهيم", "اسماعيل", "ايمن", "اسامة", "امين", "اسراء", "اية", "امل", "اميرة", "انجي"],
@@ -191,15 +190,26 @@ def check_word_validity(word: str, category: str, letter: str) -> bool:
 @bot.event
 async def on_ready():
     try:
-        # مزامنة فورية للأوامر على سيرفرك المحدد خصيصاً
         guild_id = 1527415229279895744
         guild = discord.Object(id=guild_id)
-        
         bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
         print(f"Bot online | Synced {len(synced)} commands to guild {guild_id}.")
     except Exception as e:
         print(f"Sync error: {e}")
+
+# دالة لمراقبة الوقت والمؤقت (دقيقة واحدة بدون إجابة / انضمام = إيقاف اللعبة)
+async def start_bus_timer(cid, channel):
+    await asyncio.sleep(60) # الانتظار لمدة دقيقة كاملة
+    game = bus_games.get(cid)
+    if game and game.get("started", False):
+        # التحقق مما إذا كان هناك تفاعل أو انضمام خلال الدقيقة (مثال: لم يشارك أحد أو لم ترسل إجابة صحيحة تحدد الوقت)
+        # هنا سنقوم بإيقاف اللعبة تلقائياً وإعلام الروم
+        bus_games.pop(cid, None)
+        try:
+            await channel.send(embed=games.embed("انتهت اللعبة ⌛", "تم إيقاف أتوبيس كومبليت لعدم وجود تفاعل أو إجابات خلال دقيقة واحدة.", 0xFF0000))
+        except:
+            pass
 
 @bot.event
 async def on_message(message):
@@ -218,9 +228,17 @@ async def on_message(message):
             if is_valid:
                 n_letter, n_cat = random.choice(ARABIC_LETTERS), random.choice(BUS_CATEGORIES)
                 bus_games[cid].update({"letter": n_letter, "category": n_cat})
+                
+                # إلغاء أي مهام سابقة وإعادة تشغيل مؤقت الدقيقة للسؤال الجديد
+                if "timer_task" in g_data and g_data["timer_task"]:
+                    g_data["timer_task"].cancel()
+                
+                new_task = asyncio.create_task(start_bus_timer(cid, message.channel))
+                bus_games[cid]["timer_task"] = new_task
+
                 await message.reply(
-                    embed=games.embed("إجابة صحيحة ✨", f"أحسنت {message.author.mention}! الكلمة (**{message.content}**) صحيحة.\n\nالمطلوب الجديد: **{n_cat}** بحرف **{n_letter}**", config.COLORS["success"]),
-                    view=BusControlView(cid, g_data["host"])
+                    embed=games.embed("إجابة صحيحة ✨", f"أحسنت {message.author.mention}! الكلمة (**{message.content}**) صحيحة.\n\nالمطلوب الجديد: **{n_cat}** بحرف **{n_letter}**\n*(لديك دقيقة واحدة للإجابة أو الانضمام!)*", config.COLORS["success"]),
+                    view=BusGameActiveView(cid)
                 )
                 return
             else:
@@ -228,13 +246,18 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# ==================== أوامر الإيقاف (Stop Command) ====================
+# ==================== أوامر الإيقاف ====================
 @bot.tree.command(name="stop", description="إيقاف أي لعبة جارية في هذه الروم")
 async def stop_cmd(interaction: discord.Interaction):
     cid = interaction.channel_id
     stopped_any = False
     
-    if bus_games.pop(cid, None): stopped_any = True
+    if cid in bus_games:
+        if "timer_task" in bus_games[cid] and bus_games[cid]["timer_task"]:
+            bus_games[cid]["timer_task"].cancel()
+        bus_games.pop(cid, None)
+        stopped_any = True
+        
     if roulette_games.pop(cid, None): stopped_any = True
     if mafia_games.pop(cid, None): stopped_any = True
     if chairs_games.pop(cid, None): stopped_any = True
@@ -249,7 +272,12 @@ async def stop_prefix(ctx):
     cid = ctx.channel.id
     stopped_any = False
     
-    if bus_games.pop(cid, None): stopped_any = True
+    if cid in bus_games:
+        if "timer_task" in bus_games[cid] and bus_games[cid]["timer_task"]:
+            bus_games[cid]["timer_task"].cancel()
+        bus_games.pop(cid, None)
+        stopped_any = True
+        
     if roulette_games.pop(cid, None): stopped_any = True
     if mafia_games.pop(cid, None): stopped_any = True
     if chairs_games.pop(cid, None): stopped_any = True
@@ -258,7 +286,7 @@ async def stop_prefix(ctx):
         await ctx.send(embed=games.embed("تم إيقاف اللعبة 🛑", f"تم إنهاء جميع الألعاب النشطة في هذه الروم بواسطة {ctx.author.mention}", 0xFF0000))
     else:
         await ctx.send("لا توجد أي لعبة تعمل حالياً في هذه الروم لإيقافها.")
-# ====================================================================
+# =======================================================
 
 GAME_CHOICES = [
     discord.app_commands.Choice(name="Roulette", value="roulette"),
@@ -318,7 +346,8 @@ async def game_cmd(interaction: discord.Interaction, choice: discord.app_command
                 "category": cat, 
                 "host": p.id, 
                 "players": [p.id], 
-                "started": False
+                "started": False,
+                "timer_task": None
             }
             return await interaction.response.send_message(
                 embed=games.embed("تجهيز أتوبيس كومبليت 🚌", f"أنشأ {p.mention} لعبة جديدة!\n\nاضغط على زر **انضمام 🎯** للمشاركة، وعند الانتهاء اضغط **بدء اللعبة ▶️**"), 
@@ -356,20 +385,42 @@ class BusLobbyView(discord.ui.View):
             return await i.response.send_message("اللعبة غير موجودة.", ephemeral=True)
         
         game["started"] = True
+        
+        # تشغيل مؤقت الدقيقة عند بدء اللعبة لأول مرة
+        timer_task = asyncio.create_task(start_bus_timer(self.cid, i.channel))
+        game["timer_task"] = timer_task
+
         await i.response.edit_message(
             embed=games.embed(
                 "أتوبيس كومبليت 🚌",
-                f"اللاعبون المشاركون: {len(game['players'])}\n\nالمطلوب للجميع: **{game['category']}** بحرف **{game['letter']}**\n\nأكتب الإجابة في الشات ليعرف عليها البوت تلقائياً!"
+                f"اللاعبون المشاركون: {len(game['players'])}\n\nالمطلوب للجميع: **{game['category']}** بحرف **{game['letter']}**\n\nأكتب الإجابة في الشات ليعرف عليها البوت تلقائياً!\n*(لديك دقيقة واحدة للإجابة أو الانضمام)*"
             ),
-            view=BusControlView(self.cid, self.host_id)
+            view=BusGameActiveView(self.cid)
         )
 
-class BusControlView(discord.ui.View):
-    def __init__(self, cid, host_id):
+# واجهة الأزرار التي تظهر مع كل سؤال (تحتوي على انضمام وإيقاف)
+class BusGameActiveView(discord.ui.View):
+    def __init__(self, cid):
         super().__init__(timeout=None)
-        self.cid, self.host_id = cid, host_id
-    @discord.ui.button(label="إيقاف اللعبة", style=discord.ButtonStyle.danger)
-    async def stop_bus(self, i: discord.Interaction, b: discord.ui.Button):
+        self.cid = cid
+
+    @discord.ui.button(label="انضمام للعبة 🎯", style=discord.ButtonStyle.success)
+    async def join_active(self, i: discord.Interaction, b: discord.ui.Button):
+        game = bus_games.get(self.cid)
+        if not game or not game["started"]:
+            return await i.response.send_message("اللعبة غير نشطة.", ephemeral=True)
+        if i.user.id in game["players"]:
+            return await i.response.send_message("أنت منضم بالفعل لهذه اللعبة!", ephemeral=True)
+        
+        game["players"].append(i.user.id)
+        await i.response.send_message(f"🎯 انضم {i.user.mention} إلى اللعبة بنجاح!", ephemeral=False)
+
+    @discord.ui.button(label="إيقاف اللعبة 🛑", style=discord.ButtonStyle.danger)
+    async def stop_bus_active(self, i: discord.Interaction, b: discord.ui.Button):
+        game = bus_games.get(self.cid)
+        if game and "timer_task" in game and game["timer_task"]:
+            game["timer_task"].cancel()
+            
         if bus_games.pop(self.cid, None):
             await i.response.edit_message(embed=games.embed("تم إيقاف اللعبة", f"تم الإنهاء بواسطة {i.user.mention}", 0xFF0000), view=None)
         else:
@@ -551,7 +602,7 @@ class CountryView(discord.ui.View):
             self.add_item(btn)
 
 class RPSView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, cid=None):
         super().__init__(timeout=30)
         for c in [("حجر", "Rock"), ("ورقة", "Paper"), ("مقص", "Scissors")]:
             btn = discord.ui.Button(label=c[0], style=discord.ButtonStyle.primary)
