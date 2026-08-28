@@ -31,13 +31,6 @@ mafia_games, chairs_games, roulette_games, bus_games = {}, {}, {}, {}
 
 ARABIC_LETTERS = list("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
 BUS_CATEGORIES = ["اسم", "جماد", "حيوان", "نبات", "بلاد"]
-VALID_BUS_WORDS = {
-    "اسم": ["أحمد", "محمد", "علي", "فاطمة", "سارة", "خالد", "عمر", "يوسف", "ابراهيم", "زينب", "مريم", "منى", "ريم", "سعيد", "سالم", "حسن", "حسين", "بلال", "تميم", "حمزة", "أنس", "زياد", "بدر", "تركي", "جابر", "حاتم", "داني", "راجح", "سامي", "طارق", "ظافر", "عادل", "غالب", "فهد", "قاسم", "كريم", "ماجد", "ناصر", "هادي", "وليد", "ياسر"],
-    "جماد": ["قلم", "باب", "كتاب", "كرسي", "طاولة", "سيارة", "بيت", "شباك", "ساعة", "جوال", "حاسوب", "مكتب", "سرير", "شاشة", "ثلاجة", "فرن", "وسادة", "غطاء", "حقيبة", "مفتاح", "حائط", "سجادة", "ستارة", "لوحة", "مصباح", "سفينة", "طائرة", "قطار", "صندوق", "عصا"],
-    "حيوان": ["أسد", "فهد", "نمر", "ذئب", "ثعلب", "قرد", "فيل", "زرافة", "حصان", "جمل", "بقر", "غنم", "ماعز", "كلب", "قطة", "أرنب", "دب", "تمساح", "ثعبان", "نسر", "صقر", "بومة", "حمامة", "دجاجة", "بطة", "سمكة", "حوت", "قرش", "دولفين", "أطوم"],
-    "نبات": ["تفاح", "موز", "برتقال", "عنب", "توت", "رمان", "خوخ", "مشمش", "بطيخ", "شجر", "ورد", "نخل", "قمح", "أرز", "ذرة", "عدس", "فول", "حمص", "نعناع", "بقدونس", "خس", "جزر", "بصل", "ثوم", "بطاطس", "طماطم", "خيار", "ليمون", "تين", "زيتون"],
-    "بلاد": ["مصر", "سوريا", "العراق", "اليمن", "ليبيا", "تونس", "المغرب", "الجزائر", "السودان", "قطر", "عمان", "الكويت", "الأردن", "لبنان", "فلسطين", "تركيا", "إيران", "فرنسا", "ألمانيا", "إيطاليا", "إسبانيا", "الصين", "اليابان", "الهند", "روسيا", "البرازيل", "كندا", "أمريكا", "بريطانيا"]
-}
 
 # دالة لتنظيف وتوحيد الأحرف العربية للحرف الأول
 def normalize_arabic(text):
@@ -50,16 +43,9 @@ def normalize_arabic(text):
         text = text.replace(old, new)
     return text
 
-# دالة التحقق الذكي (تتحقق أولاً من القائمة المحلية المضمنة، وإن لم تكن موجودة تفحص عبر Grok AI)
+# دالة التحقق الذكي عبر Grok AI للتأكد من تطابق الكلمة مع الفئة والحرف
 async def check_word_with_ai(word: str, category: str, letter: str) -> bool:
     clean_word = normalize_arabic(word)
-    # التحقق المحلي أولاً من القائمة الكلاسيكية لتوفير السرعة
-    if category in VALID_BUS_WORDS:
-        for item in VALID_BUS_WORDS[category]:
-            if normalize_arabic(item) == clean_word:
-                return normalize_arabic(item).startswith(normalize_arabic(letter))
-
-    # إذا لم تكن في القائمة المحلية، يتم الفحص عبر Grok AI
     try:
         prompt = (
             f"تدقيق دقيق جداً للعبة أتوبيس كومبليت:\n"
@@ -68,7 +54,7 @@ async def check_word_with_ai(word: str, category: str, letter: str) -> bool:
             f"الحرف المطلوب: '{letter}'\n\n"
             f"الشروط:\n"
             f"1. يجب أن تبدأ الكلمة بالحرف '{letter}' (تجاهل التشكيل والهمزات والتاء المربوطة والهاء).\n"
-            f"2. يجب أن تكون الكلمة بالتأكيد تنتمي لفئة ({category}) فقط بشكل صحيح ومنطقي.\n"
+            f"2. يجب أن تكون الكلمة بالتأكيد تنتمي لفئة ({category}) بشكل صحيح ومنطقي.\n"
             f"أجب بكلمة واحدة فقط: نعم أم لا."
         )
         response = await grok_client.chat.completions.create(
@@ -98,7 +84,7 @@ async def on_message(message):
     cid = message.channel.id
     if cid in bus_games:
         g_data = bus_games[cid]
-        # التحقق من أن اللعبة بدأت وأن الشخص مرسل الرسالة من ضمن اللاعبين المنضمين حصراً
+        # التحقق من أن اللعبة بدأت وأن مرسل الرسالة من ضمن اللاعبين المنضمين
         if g_data.get("started", False) and message.author.id in g_data["players"]:
             content = message.content.strip()
             if not content:
@@ -107,14 +93,16 @@ async def on_message(message):
             req_letter = normalize_arabic(g_data["letter"])
             user_first_letter = normalize_arabic(content[0])
 
+            # التحقق من أن الحرف الأول صحيح أولاً
             if user_first_letter == req_letter:
+                # التحقق عبر الذكاء الاصطناعي من أن الكلمة تنتمي للفئة المطلوبة
                 is_valid = await check_word_with_ai(content, g_data["category"], g_data["letter"])
 
                 if is_valid:
                     n_letter, n_cat = random.choice(ARABIC_LETTERS), random.choice(BUS_CATEGORIES)
                     bus_games[cid].update({"letter": n_letter, "category": n_cat})
                     await message.reply(
-                        embed=games.embed("إجابة صحيحة ✨", f"أحسنت {message.author.mention}! الكلمة (**{message.content}**) صحيحة.\n\nالمطلوب الجديد: **{n_cat}** بحرف **{n_letter}**", config.COLORS["success"]),
+                        embed=games.embed("إجابة صحيحة ✨", f"أحسنت {message.author.mention}! الكلمة (**{message.content}**) صحيحة وتنتمي للفئة.\n\nالمطلوب الجديد: **{n_cat}** بحرف **{n_letter}**", config.COLORS["success"]),
                         view=BusControlView(cid, g_data["host"])
                     )
                     return
@@ -225,7 +213,7 @@ class BusLobbyView(discord.ui.View):
         await i.response.edit_message(
             embed=games.embed(
                 "أتوبيس كومبليت 🚌",
-                f"اللاعبون المشاركون: {len(game['players'])}\n\nالمطلوب للجميع: **{game['category']}** بحرف **{game['letter']}**\n\nأكتب الإجابة في الشات ليتعرف عليها البوت تلقائياً (للاعبين المنضمين فقط)!"
+                f"اللاعبون المشاركون: {len(game['players'])}\n\nالمطلوب للجميع: **{game['category']}** بحرف **{game['letter']}**\n\nأكتب الإجابة المناسبة في الشات!"
             ),
             view=BusControlView(self.cid, self.host_id)
         )
