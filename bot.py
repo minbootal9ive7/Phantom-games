@@ -3,6 +3,7 @@ import asyncio
 import random
 import discord
 from discord.ext import commands
+import config
 import games
 
 intents = discord.Intents.default()
@@ -16,6 +17,7 @@ mafia_games, chairs_games, roulette_games, bus_games = {}, {}, {}, {}
 ARABIC_LETTERS = list("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
 BUS_CATEGORIES = ["اسم", "جماد", "حيوان", "نبات", "بلاد"]
 
+# قاعدة بيانات داخلية شاملة وموسعة للتحقق الفوري من صحة الكلمات حسب الفئة والحرف
 VALID_BUS_WORDS = {
     "اسم": {
         'ا': ["احمد", "ابراهيم", "اسماعيل", "ايمن", "اسامة", "امين", "اسراء", "اية", "امل", "اميرة", "انجي"],
@@ -24,13 +26,13 @@ VALID_BUS_WORDS = {
         'ث': ["ثامر", "ثابت", "ثريا"],
         'ج': ["جمال", "جلال", "جابر", "جهاد", "جميلة", "جومانة"],
         'ح': ["حسن", "حسين", "حامد", "حلمي", "حنان", "حليمة", "حورية"],
-        'خ': ["خالد", "خليل", "خميس", "خديجة", "خلود"],
+        'خ': ["خالد", "خليل", "خميس", "ديخ", "خديجة", "خلود"],
         'د': ["داود", "دكتور", "داليا", "دعاء", "دينا"],
         'ذ': ["ذكي", "ذكريات"],
         'ر': ["رامي", "رجب", "رشدي", "رضا", "رانيا", "رحمة", "ريم"],
         'ز': ["زياد", "زكريا", "زينب", "زهراء", "زينة"],
         'س': ["سامح", "سعيد", "سليم", "سامي", "سارة", "سلوى", "سحر"],
-        'ش': ["شريف", "شفيق", "صلاح", "شروق", "شيماء"],
+        'ش': ["ريف", "شريف", "شفيق", "صلاح", "شروق", "شيماء"],
         'ص': ["صلاح", "صقر", "صفاء", "صباح"],
         'ض': ["ضياء", "ضاحي", "ضحى"],
         'ط': ["طارق", "طه", "طلعت", "طيب", "فاطمة"],
@@ -78,12 +80,12 @@ VALID_BUS_WORDS = {
         'ي': ["يد", "يخوت", "يمامة"]
     },
     "حيوان": {
-        'ا': ["اسد", "ارنب", "اتان", "افعى", "اخطبوط"],
+        'ا': ["اسد", "ارنب", "اتان", "افعى", "اخطبوط", "الإبل"],
         'ب': ["بطة", "بقرة", "بومة", "باز", "ببر", "بلبل", "ببغاء"],
         'ت': ["تمساح", "ترس", "تيس", "تنين"],
         'ث': ["ثعلب", "ثور", "ثعبان"],
         'ج': ["جمل", "جاموس", "جرو", "جراد"],
-        'ح': ["حصان", "حمار", "حوت", "حمام", "حرباء"],
+        'ح': ["حصان", "حمار", "حوت", "حمام", "حرباء", "حمار وحشي"],
         'خ': ["خروف", "خنزير", "خلد", "خرتيت", "خطاف"],
         'د': ["دب", "دجاجة", "دولفين", "ديك", "دفدع", "دود"],
         'ذ': ["ذئب", "ذباب"],
@@ -95,14 +97,14 @@ VALID_BUS_WORDS = {
         'ض': ["ضفدع", "ضبع", "ضب"],
         'ط': ["طاووس", "طائر", "طيطوي"],
         'ظ': ["ظبي", "ظربان"],
-        'ع': ["عصفور", "عقرب", "عنزة", "عجل", "عنكبوت"],
+        'ع': ["عصفور", "عقرب", "عنزة", "عجل", "عنكبوت", "عاموق"],
         'غ': ["غزال", "غراب", "غوريلا", "غرير"],
         'ف': ["فيل", "فأر", "فهد", "فراشة", "فقمة"],
-        'ق': ["قرد", "قط", "قنفذ", "قندس", "قرش"],
+        'ق': ["قرد", "قط", "قنفذ", "قندس", "قرش", "قطط"],
         'ك': ["كلب", "كنغر", "كوالا"],
         'ل': ["ليمور"],
-        'م': ["ماعز", "معز", "نمر"],
-        'ن': ["نسر", "ناقة", "نعامة", "نحلة", "نورس"],
+        'م': ["ماعز", "معز"],
+        'ن': ["نمر", "نسر", "ناقة", "نعامة", "نحلة", "نورس"],
         'ه': ["هدهد", "هامستر", "هراس"],
         'و': ["وعل", "ورل", "واسط"],
         'ي': ["يمامة", "يعسوب", "يربوع"]
@@ -169,22 +171,37 @@ VALID_BUS_WORDS = {
     }
 }
 
+# دالة لتنظيف وتوحيد الأحرف العربية
 def normalize_arabic(text):
     text = text.strip()
-    replacements = {'أ': 'ا', 'إ': 'ا', 'آ': 'ا', 'ى': 'ي', 'ة': 'ه'}
+    replacements = {
+        'أ': 'ا', 'إ': 'ا', 'آ': 'ا',
+        'ى': 'ي', 'ة': 'ه'
+    }
     for old, new in replacements.items():
         text = text.replace(old, new)
     return text
 
+# دالة التحقق الصارمة (تتأكد من الحرف والفئة بالاعتماد على القاموس حصراً)
 def check_word_validity(word: str, category: str, letter: str) -> bool:
     clean_word = normalize_arabic(word)
     clean_letter = normalize_arabic(letter)
+    
+    # 1. التأكد أن الكلمة تبدأ بالحرف المطلوب
     if not clean_word.startswith(clean_letter):
         return False
+        
+    # 2. البحث حصراً داخل القاموس المخصص لهذه الفئة وهذا الحرف
     cat_dict = VALID_BUS_WORDS.get(category, {})
     possible_words = cat_dict.get(letter, [])
+    
     normalized_db_words = [normalize_arabic(w) for w in possible_words]
-    return clean_word in normalized_db_words
+    
+    # 3. يجب أن تكون الكلمة موجودة في القاموس الصحيح للفئة المطلوبة
+    if clean_word in normalized_db_words:
+        return True
+        
+    return False
 
 @bot.event
 async def on_ready():
@@ -205,17 +222,20 @@ async def on_message(message):
             content = message.content.strip()
             if not content:
                 return
+            
             is_valid = check_word_validity(content, g_data["category"], g_data["letter"])
+
             if is_valid:
                 n_letter, n_cat = random.choice(ARABIC_LETTERS), random.choice(BUS_CATEGORIES)
                 bus_games[cid].update({"letter": n_letter, "category": n_cat})
                 await message.reply(
-                    embed=games.embed("إجابة صحيحة ✨", f"أحسنت {message.author.mention}! الكلمة (**{message.content}**) صحيحة.\n\nالمطلوب الجديد: **{n_cat}** بحرف **{n_letter}**", games.COLORS.get("success", 0x00FF00)),
+                    embed=games.embed("إجابة صحيحة ✨", f"أحسنت {message.author.mention}! الكلمة (**{message.content}**) صحيحة.\n\nالمطلوب الجديد: **{n_cat}** بحرف **{n_letter}**", config.COLORS["success"]),
                     view=BusControlView(cid, g_data["host"])
                 )
                 return
             else:
-                await message.reply("إجابتك غلط أو الكلمة لا تنتمي للفئة المطلوبة!")
+                await message.reply("إجابتك غلط")
+
     await bot.process_commands(message)
 
 GAME_CHOICES = [
@@ -233,22 +253,21 @@ GAME_CHOICES = [
     discord.app_commands.Choice(name="Bank Game", value="bank")
 ]
 
-# تم تعديل اسم الأمر إلى games بدلاً من game بناءً على طلبك
-@bot.tree.command(name="games", description="Start a new game")
+@bot.tree.command(name="game", description="Start a new game")
 @discord.app_commands.choices(choice=GAME_CHOICES)
-async def games_cmd(interaction: discord.Interaction, choice: discord.app_commands.Choice[str]):
+async def game_cmd(interaction: discord.Interaction, choice: discord.app_commands.Choice[str]):
     try:
         g, p, cid = choice.value, interaction.user, interaction.channel_id
         if g == "roulette":
             if cid in roulette_games: return await interaction.response.send_message("توجد لعبة روليت تعمل بالفعل.", ephemeral=True)
             roulette_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
             view = RouletteLobbyView(cid)
-            await interaction.response.send_message(embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nيجب أن يكون هناك لاعبان على الأقل لتبدأ العجلة! اضغط للانضمام خلال 20 ثانية (يمكن للأدمن البدء فوراً)"), view=view)
+            await interaction.response.send_message(embed=games.embed("لعبة الروليت", f"المنشئ: {p.mention}\nاللاعبون: 1\n\nيجب أن يكون هناك لاعبان على الأقل لتبدأ العجلة! اضغط للانضمام خلال 20 ثانية"), view=view)
             asyncio.create_task(run_roulette_timer(cid, interaction.channel, await interaction.original_response(), view))
             return
         if g == "dice":
             res, wins = games.roll_dice([p.display_name, "البوت"])
-            return await interaction.response.send_message(embed=games.embed("رمي النرد", f"\n".join(f"**{k}**: `{v}`" for k, v in res.items()) + f"\n\nالفائز: {', '.join(wins)}", games.COLORS.get("success", 0x00FF00)))
+            return await interaction.response.send_message(embed=games.embed("رمي النرد", f"\n".join(f"**{k}**: `{v}`" for k, v in res.items()) + f"\n\nالفائز: {', '.join(wins)}", config.COLORS["success"]))
         if g == "mafia":
             if cid in mafia_games: return await interaction.response.send_message("توجد لعبة مافيا تعمل بالفعل.", ephemeral=True)
             mafia_games[cid] = {"host": p.id, "players": {p.id: p}, "started": False}
@@ -272,56 +291,23 @@ async def games_cmd(interaction: discord.Interaction, choice: discord.app_comman
         if g == "bus":
             if cid in bus_games: return await interaction.response.send_message("أتوبيس كومبليت يعمل بالفعل.", ephemeral=True)
             letter, cat = random.choice(ARABIC_LETTERS), random.choice(BUS_CATEGORIES)
-            bus_games[cid] = {"letter": letter, "category": cat, "host": p.id, "players": [p.id], "started": False}
+            bus_games[cid] = {
+                "letter": letter, 
+                "category": cat, 
+                "host": p.id, 
+                "players": [p.id], 
+                "started": False
+            }
             return await interaction.response.send_message(
                 embed=games.embed("تجهيز أتوبيس كومبليت 🚌", f"أنشأ {p.mention} لعبة جديدة!\n\nاضغط على زر **انضمام 🎯** للمشاركة، وعند الانتهاء اضغط **بدء اللعبة ▶️**"), 
                 view=BusLobbyView(cid, p.id)
             )
+        
         await interaction.response.send_message(embed=games.embed("تنبيه", "هذه اللعبة غير متوفرة حالياً."), ephemeral=True)
     except Exception as e:
-        print(f"Error in games_cmd: {e}")
+        print(f"Error in game_cmd: {e}")
         if not interaction.response.is_done():
             await interaction.response.send_message("حدث خطأ أثناء تشغيل اللعبة.", ephemeral=True)
-
-STOP_CHOICES = [
-    discord.app_commands.Choice(name="Roulette", value="roulette"),
-    discord.app_commands.Choice(name="Mafia", value="mafia"),
-    discord.app_commands.Choice(name="Musical Chairs", value="chairs"),
-    discord.app_commands.Choice(name="Bus Complete", value="bus"),
-    discord.app_commands.Choice(name="XO", value="xo"),
-    discord.app_commands.Choice(name="Hot XO", value="hotxo")
-]
-
-@bot.tree.command(name="stop", description="Stop an active game in the channel")
-@discord.app_commands.choices(game=STOP_CHOICES)
-async def stop_game_cmd(interaction: discord.Interaction, game: discord.app_commands.Choice[str]):
-    cid = interaction.channel_id
-    g_type = game.value
-    stopped = False
-
-    if g_type == "roulette":
-        if cid in roulette_games:
-            roulette_games.pop(cid, None)
-            stopped = True
-    elif g_type == "mafia":
-        if cid in mafia_games:
-            mafia_games.pop(cid, None)
-            stopped = True
-    elif g_type == "chairs":
-        if cid in chairs_games:
-            chairs_games.pop(cid, None)
-            stopped = True
-    elif g_type == "bus":
-        if cid in bus_games:
-            bus_games.pop(cid, None)
-            stopped = True
-    elif g_type in ("xo", "hotxo"):
-        stopped = True
-
-    if stopped:
-        await interaction.response.send_message(embed=games.embed("تم إيقاف اللعبة", f"تم إيقاف لعبة `{game.name}` بواسطة {interaction.user.mention}", 0xFF0000))
-    else:
-        await interaction.response.send_message(embed=games.embed("تنبيه", f"لا توجد لعبة `{game.name}` نشطة حالياً في هذه الشات."), ephemeral=True)
 
 class BusLobbyView(discord.ui.View):
     def __init__(self, cid, host_id):
@@ -335,6 +321,7 @@ class BusLobbyView(discord.ui.View):
             return await i.response.send_message("انتهت اللعبة أو بدأت بالفعل.", ephemeral=True)
         if i.user.id in game["players"]:
             return await i.response.send_message("أنت منضم بالفعل!", ephemeral=True)
+        
         game["players"].append(i.user.id)
         await i.response.send_message(f"🎯 انضم {i.user.mention} إلى أتوبيس كومبليت!", ephemeral=False)
 
@@ -345,9 +332,13 @@ class BusLobbyView(discord.ui.View):
         game = bus_games.get(self.cid)
         if not game:
             return await i.response.send_message("اللعبة غير موجودة.", ephemeral=True)
+        
         game["started"] = True
         await i.response.edit_message(
-            embed=games.embed("أتوبيس كومبليت 🚌", f"اللاعبون المشاركون: {len(game['players'])}\n\nالمطلوب للجميع: **{game['category']}** بحرف **{game['letter']}**\n\nأكتب الإجابة في الشات ليعرف عليها البوت تلقائياً!"),
+            embed=games.embed(
+                "أتوبيس كومبليت 🚌",
+                f"اللاعبون المشاركون: {len(game['players'])}\n\nالمطلوب للجميع: **{game['category']}** بحرف **{game['letter']}**\n\nأكتب الإجابة في الشات ليعرف عليها البوت تلقائياً!"
+            ),
             view=BusControlView(self.cid, self.host_id)
         )
 
@@ -358,7 +349,7 @@ class BusControlView(discord.ui.View):
     @discord.ui.button(label="إيقاف اللعبة", style=discord.ButtonStyle.danger)
     async def stop_bus(self, i: discord.Interaction, b: discord.ui.Button):
         if bus_games.pop(self.cid, None):
-            await i.response.edit_message(embed=games.embed("تم إيقاف اللعبة", f"تم الإنهاء بواسطة {i.user.mention}", 0xFF0000), view=None)
+            await i.response.edit_message(embed=games.embed("تم إيقاف اللعبة", f"تم الإنهاء بواسطة {i.user.mention}", config.COLORS.get("error", 0xFF0000)), view=None)
         else:
             await i.response.send_message("اللعبة منتهية بالفعل.", ephemeral=True)
 
@@ -369,6 +360,7 @@ async def run_roulette_timer(cid, channel, msg, view):
     if not game or not game["players"]: return
     
     players_list = list(game["players"].values())
+    
     try: await msg.delete()
     except: pass
 
@@ -391,11 +383,12 @@ async def run_roulette_timer(cid, channel, msg, view):
         spin_msg = await channel.send(embed=games.embed("عجلة الروليت", f"الفائز: **{winner_name}**"))
     
     await asyncio.sleep(7)
+    
     try: await spin_msg.delete()
     except: pass
 
     await channel.send(
-        embed=games.embed("فائز الروليت", f"مبروك للفائز:\n{winner_user.mention}\n\nهل تريدون إعادة اللعبة؟", 0x00FF00),
+        embed=games.embed("فائز الروليت", f"مبروك للفائز:\n{winner_user.mention}\n\nهل تريدون إعادة اللعبة؟", config.COLORS["success"]),
         view=RouletteRestartView()
     )
 
@@ -408,11 +401,11 @@ class RouletteRestartView(discord.ui.View):
         cid = i.channel_id
         if cid in roulette_games:
             return await i.response.send_message("توجد لعبة روليت تعمل بالفعل.", ephemeral=True)
+        
         roulette_games[cid] = {"host": i.user.id, "players": {i.user.id: i.user}, "started": False}
         view = RouletteLobbyView(cid)
-        is_admin = i.user.guild_permissions.administrator
-        admin_text = "\n*(يستطيع الأدمن بدء اللعبة بلاعب واحد)*" if is_admin else ""
-        await i.response.edit_message(embed=games.embed("لعبة الروليت", f"تم إعادة فتح اللعبة بواسطة {i.user.mention}\nاللاعبون: 1\n\nيجب أن يكون هناك لاعبان على الأقل لتبدأ العجلة! اضغط للانضمام خلال 20 ثانية{admin_text}"), view=view)
+        
+        await i.response.edit_message(embed=games.embed("لعبة الروليت", f"تم إعادة فتح اللعبة بواسطة {i.user.mention}\nاللاعبون: 1\n\nيجب أن يكون هناك لاعبان على الأقل لتبدأ العجلة! اضغط للانضمام خلال 20 ثانية"), view=view)
         asyncio.create_task(run_roulette_timer(cid, i.channel, await i.original_response(), view))
 
     @discord.ui.button(label="إنهاء ❌", style=discord.ButtonStyle.danger)
@@ -423,54 +416,13 @@ class RouletteLobbyView(discord.ui.View):
     def __init__(self, cid):
         super().__init__(timeout=20)
         self.cid = cid
-
     @discord.ui.button(label="انضمام", style=discord.ButtonStyle.success)
     async def join(self, i: discord.Interaction, b: discord.ui.Button):
         game = roulette_games.get(self.cid)
         if not game or game["started"] or i.user.id in game["players"]: return await i.response.send_message("لا يمكنك الانضمام.", ephemeral=True)
         game["players"][i.user.id] = i.user
-        is_admin = i.user.guild_permissions.administrator
-        admin_text = "\n*(يستطيع الأدمن بدء اللعبة بلاعب واحد)*" if is_admin else ""
-        await i.response.edit_message(embed=games.embed("لعبة الروليت", f"المنشئ: <@{game['host']}>\nاللاعبون: {len(game['players'])}\n\n(مطلوب لاعبان على الأقل لبدء الدوران){admin_text}"))
+        await i.response.edit_message(embed=games.embed("لعبة الروليت", f"المنشئ: <@{game['host']}>\nاللاعبون: {len(game['players'])}\n\n(مطلوب لاعبان على الأقل لبدء الدوران)"))
         await i.followup.send("تم الانضمام!", ephemeral=True)
-
-    @discord.ui.button(label="بدء الآن (للأدمن فقط) ⚡", style=discord.ButtonStyle.primary)
-    async def force_start(self, i: discord.Interaction, b: discord.ui.Button):
-        if not i.user.guild_permissions.administrator:
-            return await i.response.send_message("هذا الزر مخصص لأصحاب صلاحيات الإدارة (Administrator) فقط!", ephemeral=True)
-        game = roulette_games.get(self.cid)
-        if not game or game["started"]:
-            return await i.response.send_message("اللعبة غير موجودة أو بدأت بالفعل.", ephemeral=True)
-        game["started"] = True
-        self.stop()
-        channel = i.channel
-        try: await i.message.delete()
-        except: pass
-
-        players_list = list(game["players"].values())
-        players_data = []
-        for usr in players_list:
-            try: img = await games.download_avatar(usr.display_avatar.url)
-            except: img = None
-            players_data.append({"name": usr.display_name, "user": usr, "avatar": img})
-        
-        winner_name = games.roulette_winner([p["name"] for p in players_data])
-        winner_user = next((p["user"] for p in players_data if p["name"] == winner_name), players_list[0])
-
-        try:
-            spin_msg = await channel.send(embed=games.embed("عجلة الروليت (تشغيل إداري)", "جارٍ التدوير..."), file=discord.File(games.create_roulette_gif(players_data, winner_name), filename="roulette.gif"))
-        except:
-            spin_msg = await channel.send(embed=games.embed("عجلة الروليت (تشغيل إداري)", f"الفائز: **{winner_name}**"))
-        
-        await asyncio.sleep(7)
-        try: await spin_msg.delete()
-        except: pass
-
-        roulette_games.pop(self.cid, None)
-        await channel.send(
-            embed=games.embed("فائز الروليت", f"مبروك للفائز:\n{winner_user.mention}\n\nهل تريدون إعادة اللعبة؟", 0x00FF00),
-            view=RouletteRestartView()
-        )
 
 class MafiaView(discord.ui.View):
     def __init__(self, cid):
@@ -519,7 +471,7 @@ async def run_chairs(cid):
     if len(players) == 1:
         chairs_games.pop(cid, None)
         ch = bot.get_channel(cid)
-        if ch: await ch.send(embed=games.embed("فائز الكراسي", f"{players[0].display_name}", 0x00FF00))
+        if ch: await ch.send(embed=games.embed("فائز الكراسي", f"{players[0].display_name}", config.COLORS["success"]))
         return
     game["round"] += 1
     view = ChairView(cid, len(players) - 1)
@@ -577,7 +529,7 @@ class CountryView(discord.ui.View):
             self.add_item(btn)
 
 class RPSView(discord.ui.View):
-    def __init__(self,):
+    def __init__(self):
         super().__init__(timeout=30)
         for c in [("حجر", "Rock"), ("ورقة", "Paper"), ("مقص", "Scissors")]:
             btn = discord.ui.Button(label=c[0], style=discord.ButtonStyle.primary)
@@ -590,5 +542,4 @@ class RPSView(discord.ui.View):
             btn.callback = cb
             self.add_item(btn)
 
-# ضع التوكن الخاص بالبوت هنا
-bot.run("YOUR_BOT_TOKEN_HERE")
+bot.run(config.TOKEN)
